@@ -39,6 +39,14 @@ constexpr uint32_t UID_BOOTLOADER_DESCRIPTOR = 0x5E1FB055;
     uint32_t * magicWord = &data; // I'm here for the unit-tests
     BootloaderDescriptor testBootLoaderDescriptor;
     BootloaderDescriptor* bootLoaderDescriptor = &testBootLoaderDescriptor;
+#elif defined(SBLIB_PLATFORM_RP2350)
+    // There is no Selfbus bootloader for the RP2350 yet; 0x10000000 is the flash (XIP) here.
+    // Descriptor and legacy magic word are kept in RAM that is not initialized at startup,
+    // so a future bootloader could read them after a reset.
+    static uint32_t __uninitialized_ram(magicWordStorage);
+    static BootloaderDescriptor __uninitialized_ram(bootLoaderDescriptorStorage);
+    uint32_t* magicWord = &magicWordStorage;
+    BootloaderDescriptor* bootLoaderDescriptor = &bootLoaderDescriptorStorage;
 #else
     auto magicWord = reinterpret_cast<uint32_t*>(0x10000000UL);
     auto bootLoaderDescriptor = reinterpret_cast<BootloaderDescriptor*>(0x100000C0UL);
@@ -47,7 +55,7 @@ constexpr uint32_t UID_BOOTLOADER_DESCRIPTOR = 0x5E1FB055;
 
 bool isRAMReserved()
 {
-#ifndef IAP_EMULATION
+#if !defined(IAP_EMULATION) && !defined(SBLIB_PLATFORM_RP2350)
     const auto ramBaseAddress = reinterpret_cast<uintptr_t>(&__base_RAM);
     if (ramBaseAddress >= (reinterpret_cast<uintptr_t>(bootLoaderDescriptor) + BOOTLOADER_DESCRIPTOR_SIZE))
     {

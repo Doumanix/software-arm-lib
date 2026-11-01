@@ -84,7 +84,12 @@ unsigned int elapsed(unsigned int ref);
 /**
  * The number of CPU clock cycles per microsecond.
  */
-#define clockCyclesPerMicrosecond() (SystemCoreClock / 1000000)
+#if defined(SBLIB_PLATFORM_RP2350)
+// System clock as configured at compile time (Pico SDK SYS_CLK_HZ, default 150 MHz)
+#   define clockCyclesPerMicrosecond() (SYS_CLK_HZ / 1000000)
+#else
+#   define clockCyclesPerMicrosecond() (SystemCoreClock / 1000000)
+#endif
 
 /**
  * Convert the clock cycles cyc to microseconds.
@@ -106,9 +111,14 @@ unsigned int elapsed(unsigned int ref);
  * @def CPU frequency in Hz
  */
 #ifndef F_CPU
-#   define F_CPU (48000000UL)
+#   if defined(SBLIB_PLATFORM_RP2350)
+#       define F_CPU (SYS_CLK_HZ)
+#   else
+#       define F_CPU (48000000UL)
+#   endif
 #endif
 
+#if defined(SBLIB_PLATFORM_LPC11XX)
 /**
  * @def DELAY_USEC_HIGH_PRECISION macro for higher precision microsecond delay
  *      0 < usec < 10
@@ -117,6 +127,9 @@ unsigned int elapsed(unsigned int ref);
  *      from: https://www.mikrocontroller.net/topic/378584#4302525
  */
 #define DELAY_USEC_HIGH_PRECISION(usec) delay_cycles(static_cast<float>(F_CPU) * (usec) / 1E6f / 6.f+1)
+#endif /* SBLIB_PLATFORM_LPC11XX */
+
+#if defined(SBLIB_PLATFORM_LPC11XX)
 
 /**
  * The 16bit timer #0.
@@ -639,6 +652,166 @@ ALWAYS_INLINE bool Timer::getMatchChannelLevel(const int channel) const
     return (bool)(timer->EMR & (1 << channel));
 }
 
+#elif defined(SBLIB_PLATFORM_RP2350)
+
+/**
+ * The emulated 16bit timer #0.
+ */
+extern Timer timer16_0;
+
+/**
+ * The emulated 16bit timer #1 (KNX bus timer).
+ */
+extern Timer timer16_1;
+
+/**
+ * The emulated 32bit timer #0.
+ */
+extern Timer timer32_0;
+
+/**
+ * The emulated 32bit timer #1.
+ */
+extern Timer timer32_1;
+
+/**
+ * Emulation of the LPC11xx timers on the RP2350, see src/rp2350/timer.cpp.
+ *
+ * Same interface as the LPC11xx Timer class. The timer counts microseconds (the prescaler
+ * is stored but not used, the KNX bus sets it for 1 MHz). Matches are scheduled with a
+ * dedicated hardware alarm per timer, the interrupt handler TIMERxx_y_IRQHandler() of the
+ * timer is called from the alarm interrupt.
+ *
+ * Pins as with the LPC11xx 16 bit timer #1 (CT16B1): capture CAP0 is PIN_EIB_RX (falling
+ * edge, GPIO interrupt), the PWM output of match MAT0 is PIN_EIB_TX (HIGH from the MAT0
+ * match until the MAT2 match). The other timers have no pins.
+ */
+class Timer
+{
+public:
+    explicit Timer(uint8_t aTimerNum);
+
+    void begin() const;
+    void end() const;
+    void prescaler(unsigned int factor) const;
+    unsigned int prescaler() const;
+    void start() const;
+    void stop() const;
+    void restart() const;
+    void reset() const;
+    unsigned int value() const;
+    void value(unsigned int val) const;
+    void interrupts() const;
+    void noInterrupts() const;
+    int flags() const;
+    void resetFlags() const;
+    void resetFlag(TimerMatch match) const;
+    void resetFlag(TimerCapture capture) const;
+    bool flag(TimerMatch match) const;
+    bool flag(TimerCapture capture) const;
+    static int flagMask(TimerMatch match);
+    static int flagMask(TimerCapture capture);
+    void matchMode(int channel, int mode) const;
+    int matchMode(int channel) const;
+    void match(int channel, unsigned int value) const;
+    unsigned int match(int channel) const;
+    void captureMode(int channel, int mode) const;
+    int captureMode(int channel) const;
+    unsigned int capture(int channel) const;
+    void pwmEnable(int channel) const;
+    void pwmDisable(int channel) const;
+    void counterMode(int mode, int clearMode) const;
+    void matchModePinConfig(int channel, int mode) const;
+    bool is32bitTimer() const;
+    bool getMatchChannelLevel(int channel) const;
+    void setIRQPriority(InterruptPriority newPriority) const;
+
+protected:
+    uint8_t timerNum;
+};
+
+ALWAYS_INLINE int Timer::flagMask(const TimerMatch match)
+{
+    return 1 << match;
+}
+
+ALWAYS_INLINE int Timer::flagMask(const TimerCapture capture)
+{
+    return 16 << capture;
+}
+
+ALWAYS_INLINE bool Timer::is32bitTimer() const
+{
+    return timerNum >= TIMER32_0;
+}
+
+#if defined(SBLIB_RP2350_TIMER_STATS)
+/**
+ * Counters of the timer emulation since start, for diagnostics only
+ * (CMake option SBLIB_RP2350_TIMER_STATS).
+ */
+struct TimerEmulationStats
+{
+    uint32_t alarmIrqs;             //!< hardware alarm interrupts of all timers
+    uint32_t alarmIrqsWithoutMatch; //!< alarm interrupts in which no match was due
+    uint32_t forcedIrqs;            //!< alarm interrupts forced because the time already passed
+    uint32_t shortSchedules;        //!< alarms scheduled at most 2 us ahead
+    uint32_t captureEvents;         //!< capture events (falling edges)
+    uint32_t handlerCalls;          //!< calls of the TIMERxx_y_IRQHandler functions
+    uint32_t lateTxEdges;           //!< bus PWM edges whose alarm came after the edge time
+    uint32_t shortGapCaptures;      //!< capture edges closer than 8 us to the previous one (captured as well)
+    uint32_t shortGapCapturesInTx;  //!< of these: during an own bus PWM pulse (TX high)
+    uint32_t minShortGapUs;         //!< smallest distance of such an edge to the previous one, if any
+    uint32_t shortGapUs[8];         //!< capture edges per distance 0..7 us to the previous one
+
+    // TX edges of the bus PWM (system time). Delay classes: [0..6] 0..6 us after the exact edge time, [7] 7 us or more.
+    // First pulse of a telegram: no TX pulse in the 1000 us before.
+    uint32_t txRiseLateUs[8];        //!< rising TX edges (pulse start) per delay
+    uint32_t txFallLateUs[8];        //!< falling TX edges (pulse end) per delay
+    uint32_t txFirstFallLateUs[8];   //!< of these: end of the first pulse of a telegram
+    uint32_t txWidthUs[8];           //!< TX pulses per width: [0] up to 33 us, [1..6] 34..39 us, [7] 40 us or more
+    uint32_t txFirstWidthUs[8];      //!< of these: first pulse of a telegram
+    uint32_t lateEdgesScheduledLate; //!< late TX edges whose alarm was programmed at most PwmEdgeLeadUs before the edge
+    uint32_t lateEdgesAfterRx;       //!< other late TX edges: the RX edge interrupt ran when the alarm was due
+    uint32_t lateEdgesOther;         //!< other late TX edges (interrupts disabled, interrupt entry)
+    uint32_t edgeIrqLatencyUs[8];    //!< interrupts of a TX edge per delay after the alarm time ([7] 7 us or more)
+    uint32_t txEdgeFallbacks;        //!< TX edges switched by the match processing, not by the TX edge interrupt
+
+    // RX edge interrupt (capture incl. the timer interrupt handler) and timer interrupt handler
+    uint32_t rxIrqUs[8]; //!< RX edge interrupts per duration: [0] below 2 us, [n] below 2^(n+1) us, [7] 128 us or more
+    uint32_t rxIrqMaxUs; //!< longest RX edge interrupt
+    uint32_t rxIrqFirstEchoMaxUs; //!< longest RX edge interrupt during the first pulse of a telegram (own echo)
+    uint32_t alarmHandlerMaxUs;   //!< longest call of the timer interrupt handler from the alarm interrupt
+
+    // Interrupt load of the timer emulation (order 052)
+    uint32_t txEdgeIrqs; //!< TX edge interrupts (bus PWM without SBLIB_RP2350_PIO_BUS)
+    uint32_t rxEdgeIrqs; //!< RX edge interrupts: GPIO interrupts, with SBLIB_RP2350_PIO_BUS DMA interrupts
+    uint32_t irqBusyUs;  //!< time in the alarm, TX edge and RX edge interrupts (a nested interrupt counts twice)
+
+    // RX edges by PIO and DMA (SBLIB_RP2350_PIO_BUS)
+    uint32_t rxEdgeDelayUs[8]; //!< RX edges per delay to their interrupt: [0] below 2 us, [n] below 2^(n+1) us
+    uint32_t rxEdgeDelayMaxUs; //!< longest delay from an RX edge to its interrupt
+    uint32_t rxEdgeDuplicates; //!< DMA interrupts without a new edge time
+
+    // TX edges by a PIO state machine (SBLIB_RP2350_PIO_BUS)
+    uint32_t pioTxTargets;      //!< edge times given to the state machine
+    uint32_t pioTxLateTargets;  //!< of these: moved because they were less than PioTargetLeadUs ahead
+    uint32_t pioTxCancels;      //!< planned pulse starts cancelled
+    uint32_t pioTxConfirmed;    //!< edges confirmed by the state machine at their time
+    uint32_t pioTxResyncs;      //!< missing or wrong confirmation: TX low, state machine synchronised again
+    uint32_t pioTxSyncAttempts; //!< attempts to start the state machine within its microsecond (begin() and resyncs)
+    uint32_t pioTxStrayHigh;    //!< TX HIGH without a pulse of the emulation, ended by the next edge
+};
+
+/**
+ * @brief Get the counters of the timer emulation.
+ */
+const volatile TimerEmulationStats& timerEmulationStats();
+#endif
+
+#endif /* Timer */
+
+#if defined(SBLIB_PLATFORM_LPC11XX)
 /**
  * @fn void delay_cycles(unsigned int)
  * @brief Delay for "cycles" CPU cycles
@@ -664,4 +837,5 @@ static inline void delay_cycles(unsigned int cycles)
         : "0" (cycles) // this is also an input value
         : "cc");
 }
+#endif /* SBLIB_PLATFORM_LPC11XX: delay_cycles */
 #endif /* SBLIB_TIMER_H_ */

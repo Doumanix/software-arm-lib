@@ -278,6 +278,16 @@ void digitalWrite(uint32_t pin, bool value);
 bool digitalRead(uint32_t pin);
 
 /**
+ * @brief Set or clear several output pins of one port at once.
+ *
+ * @param portNum   The port: the value of @ref digitalPinToPort() of the pins
+ *                  (LPC11xx: PIO0..PIO3, RP2350: 0 = GPIO0..31, 1 = GPIO32..47)
+ * @param pinMask   The bit mask of the pins, e.g. digitalPinToBitMask(pin) | ...
+ * @param value     true sets the pins, false clears them. Pins not in pinMask are unchanged.
+ */
+void portWriteMask(uint8_t portNum, uint32_t pinMask, bool value);
+
+/**
  * Output a byte on a digital pin. The output is done bit by bit. The clock pin
  * pulses the output. Output of a bit happens when the clock pin is high. This
  * is a software function. For hardware supported output of data, see SPI or I2C.
@@ -341,6 +351,7 @@ constexpr uint8_t digitalPinToPinNum(const uint32_t pin) {return (pin & 31);} //
  */
 constexpr uint32_t digitalPinToBitMask(const uint32_t pin) {return (1 << digitalPinToPinNum(pin));}
 
+#if defined(SBLIB_PLATFORM_LPC11XX)
 /**
  * @brief Maps a GPIO port number to its corresponding IRQn.
  *
@@ -378,6 +389,18 @@ ALWAYS_INLINE bool digitalRead(const uint32_t pin)
     return gpioPorts[digitalPinToPort(pin)]->MASKED_ACCESS[digitalPinToBitMask(pin)] != 0;
 }
 
+ALWAYS_INLINE void portWriteMask(const uint8_t portNum, const uint32_t pinMask, const bool value)
+{
+    if (value)
+    {
+        gpioPorts[portNum]->MASKED_ACCESS[pinMask] = pinMask;
+    }
+    else
+    {
+        gpioPorts[portNum]->MASKED_ACCESS[pinMask] = 0;
+    }
+}
+
 ALWAYS_INLINE void pinEnableInterrupt(const uint32_t pin)
 {
     LPC_GPIO_TypeDef* port = gpioPorts[digitalPinToPort(pin)];
@@ -393,5 +416,78 @@ ALWAYS_INLINE void pinDisableInterrupt(const uint32_t pin)
 
     port->IE &= ~mask;
 }
+
+#elif defined(SBLIB_PLATFORM_RP2350)
+
+/**
+ * @brief Get the GPIO number of the pin.
+ *
+ * @param pin   The pin to process, e.g. GPIO27
+ * @return The GPIO number of the pin, e.g. 27
+ */
+constexpr uint32_t digitalPinToGpio(const uint32_t pin) {return digitalPinToPort(pin) * 32 + digitalPinToPinNum(pin);}
+
+/**
+ * @brief Maps a GPIO port number to its corresponding IRQn.
+ * @details All GPIOs of the RP2350 share one interrupt (IO_IRQ_BANK0, secure core).
+ *
+ * @param port GPIO bank number
+ * @return IO_IRQ_BANK0
+ */
+constexpr IRQn_Type digitalPortToIRQn([[maybe_unused]] const Port port)
+{
+    return IO_IRQ_BANK0;
+}
+
+/**
+ * @brief Maps a GPIO pin to its corresponding IRQn.
+ * @details All GPIOs of the RP2350 share one interrupt (IO_IRQ_BANK0, secure core).
+ *
+ * @param pinNumber GPIO pin e.g., GPIO27
+ * @return IO_IRQ_BANK0
+ */
+constexpr IRQn_Type digitalPinToIRQn([[maybe_unused]] const uint32_t pinNumber)
+{
+    return IO_IRQ_BANK0;
+}
+
+//
+//  Inline functions
+//
+//  pinEnableInterrupt() and pinDisableInterrupt() are implemented in src/rp2350/digital_pin.cpp.
+//
+
+// Pins that do not exist on the chip (e.g. GPIO_NC) are ignored. For constant pins the
+// check is resolved by the compiler.
+
+ALWAYS_INLINE void digitalWrite(const uint32_t pin, const bool value)
+{
+    const uint32_t gpio = digitalPinToGpio(pin);
+    if (gpio < NUM_BANK0_GPIOS)
+    {
+        gpio_put(gpio, value);
+    }
+}
+
+ALWAYS_INLINE bool digitalRead(const uint32_t pin)
+{
+    const uint32_t gpio = digitalPinToGpio(pin);
+    return (gpio < NUM_BANK0_GPIOS) && gpio_get(gpio);
+}
+
+ALWAYS_INLINE void portWriteMask(const uint8_t portNum, const uint32_t pinMask, const bool value)
+{
+    const uint64_t mask = static_cast<uint64_t>(pinMask) << (32 * (portNum & 1));
+    if (value)
+    {
+        gpio_set_mask64(mask);
+    }
+    else
+    {
+        gpio_clr_mask64(mask);
+    }
+}
+
+#endif
 
 #endif /* SBLIB_DIGITAL_PIN_H_ */

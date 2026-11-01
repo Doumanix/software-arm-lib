@@ -277,6 +277,35 @@ private:
     uint8_t collisions = 0;                 //!< Number of collisions when sending @ref sendCurTelegram
 };
 
+#if defined(SBLIB_RP2350_TIMER_STATS)
+/**
+ * Diagnostics of @ref Bus::pause() (CMake option SBLIB_RP2350_TIMER_STATS, RP2350 only).
+ * States are the values of the bus state machine (Bus::State).
+ */
+struct BusPauseStats
+{
+    uint32_t calls;         //!< calls of pause() since start
+    uint32_t lastUs;        //!< duration of the last pause() call in us
+    uint32_t maxUs;         //!< longest pause() call since start in us
+    uint32_t maxIterations; //!< loop iterations of the longest call
+    uint8_t maxEntryState;  //!< bus state at the start of the longest call
+    uint8_t maxStuckState;  //!< bus state after 100 ms in the longest call, 0xff if it took less
+};
+
+/**
+ * @brief Get the pause() counters since start.
+ */
+const volatile BusPauseStats& busPauseStats();
+
+/**
+ * Get the longest pause() call of the previous run, kept in the watchdog scratch registers
+ * over a watchdog reboot (e.g. the restart by the ETS). Clears the record.
+ *
+ * @return true if a record was present
+ */
+bool busPauseStatsPreviousRun(BusPauseStats& out);
+#endif
+
 
 /**
  * Create an interrupt handler for the EIB bus access. This macro must be used

@@ -21,6 +21,11 @@
 
 #include <sblib/eib/bcu_base.h>
 
+#if defined(SBLIB_PLATFORM_RP2350)
+#   include <hardware/clocks.h>
+#endif
+
+#if defined(SBLIB_PLATFORM_LPC11XX)
 /**
  * @brief Initializes the library.
  *        - Configures and starts the system timer to call SysTick_Handler once every 1 millisecond.
@@ -29,6 +34,17 @@ static inline void lib_setup()
 {
     SysTick_Config(SystemCoreClock / 1000);
 }
+#elif defined(SBLIB_PLATFORM_RP2350)
+/**
+ * @brief Initializes the library.
+ *        Clocks and the system timer are initialized by the Pico SDK runtime before main(),
+ *        millis() needs no interrupt.
+ */
+static inline void lib_setup()
+{
+    SystemCoreClock = clock_get_hz(clk_sys);
+}
+#endif
 
 /**
  * @brief The main of the Selfbus library.

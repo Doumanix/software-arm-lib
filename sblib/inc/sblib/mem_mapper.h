@@ -77,7 +77,7 @@ public:
      * @note @ref ramBuffer and the managed region are page aligned, so the entries of an
      *       allocation table are aligned for this type.
      */
-#if defined(MEMMAPPER_LARGE_INDICES)
+#if defined(SBLIB_PLATFORM_RP2350) || defined(MEMMAPPER_LARGE_INDICES)
     using AllocEntryType = uint16_t;
     static constexpr AllocEntryType AllocEntryXorMask = 0xffffu; ///< XOR mask of one entry in flash.
 #else

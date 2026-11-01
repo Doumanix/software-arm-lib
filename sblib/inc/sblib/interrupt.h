@@ -148,6 +148,8 @@ extern "C" void handler() { callback; }
 // Inline functions
 //
 
+#if defined(SBLIB_PLATFORM_LPC11XX)
+
 FORCE_INLINE void noInterrupts()
 {
     // data synchronization barrier and instruction synchronization barrier to ensure that no interrupt occurs after we disabled them
@@ -215,5 +217,93 @@ FORCE_INLINE void setInterruptPriority(const IRQn_Type interruptType, const Inte
 {
     NVIC_SetPriority(interruptType, static_cast<uint32_t>(newPriority));
 }
+
+#elif defined(SBLIB_PLATFORM_RP2350)
+
+// Only the Pico SDK API is used (hardware_sync, hardware_irq). The RP2350 has more than
+// 32 interrupts, and the SDK functions keep the SDK's view of the interrupt state consistent.
+
+FORCE_INLINE void noInterrupts()
+{
+    // data synchronization barrier and instruction synchronization barrier to ensure that no interrupt occurs
+    // after we disabled them
+    __dsb();
+    __isb();
+    disable_interrupts();
+}
+
+FORCE_INLINE void interrupts()
+{
+    enable_interrupts();
+}
+
+FORCE_INLINE void waitForInterrupt()
+{
+    // No sleep on the RP2350, a NOP instead of WFI. Polling loops use the pattern
+    // "interrupts(); waitForInterrupt();": an interrupt between both calls is handled before
+    // the WFI, which then sleeps until the next interrupt. On the LPC11xx the SysTick wakes
+    // the core after at most 1 ms; the RP2350 port has no periodic interrupt, so a WFI would
+    // sleep until the next bus edge (main loop stalled after an ETS download).
+    // Bus::pause() uses waitForInterruptMasked() instead, which has no such window.
+    __nop();
+}
+
+FORCE_INLINE void waitForInterruptMasked()
+{
+    __dsb();
+    __wfi();
+}
+
+FORCE_INLINE bool isInsideInterrupt()
+{
+    return __get_current_exception() != 0;
+}
+
+FORCE_INLINE void enableInterrupt(const IRQn_Type interruptType)
+{
+    irq_set_enabled(interruptType, true);
+}
+
+FORCE_INLINE void disableInterrupt(const IRQn_Type interruptType)
+{
+    // data synchronization barrier and instruction synchronization barrier to ensure that no interrupt occurs
+    // after we disabled them
+    __dsb();
+    __isb();
+    irq_set_enabled(interruptType, false);
+}
+
+FORCE_INLINE void clearPendingInterrupt(const IRQn_Type interruptType)
+{
+    irq_clear(interruptType);
+}
+
+FORCE_INLINE void setPendingInterrupt(const IRQn_Type interruptType)
+{
+    irq_set_pending(interruptType);
+}
+
+FORCE_INLINE bool getInterruptEnabled(const IRQn_Type interruptType)
+{
+    if (interruptType >= 0)
+    {
+        return irq_is_enabled(interruptType);
+    }
+
+    fatalError();
+    return false; // Just here to make the linter happy
+}
+
+/**
+ * The Cortex-M33 of the RP2350 has 16 priority levels (4 bits, upper nibble of the 8 bit
+ * hardware priority). The four @ref InterruptPriority levels are spread over the full range:
+ * highest = 0x00, high = 0x40, medium = 0x80 (= PICO_DEFAULT_IRQ_PRIORITY), low = 0xc0.
+ */
+FORCE_INLINE void setInterruptPriority(const IRQn_Type interruptType, const InterruptPriority newPriority)
+{
+    irq_set_priority(interruptType, static_cast<uint8_t>(static_cast<uint8_t>(newPriority) << 6));
+}
+
+#endif
 
 #endif /* SBLIB_INTERRUPT_H_ */

@@ -16,6 +16,14 @@
 #include "sblib/bits.h"
 #include "sblib/eib/callback_bcu.h"
 
+#if defined(SBLIB_PLATFORM_RP2350)
+#   include "sblib/timer.h"
+#   ifndef PROG_PIN_SETTLE_TIME_US
+// Wait time in microseconds between switching the programming pin to input and reading it.
+// A board header may define its own value.
+#      define PROG_PIN_SETTLE_TIME_US 20
+#   endif
+#endif
 
 static Bus* timerBusObj;
 // The interrupt handler for the EIB bus access object
@@ -84,6 +92,12 @@ void BcuBase::loop()
     {
         // Detect the falling edge of pressing the prog button
         pinMode(progPin, INPUT | PULL_UP);
+#if defined(SBLIB_PLATFORM_RP2350)
+        // The pin was an output driving the LED; with programming mode on it was LOW. The RP2350
+        // reads the pin right after switching, before the pull-up has charged the LED/button
+        // wiring, and would always see a pressed button. Let the level settle first.
+        delayMicroseconds(PROG_PIN_SETTLE_TIME_US);
+#endif
         int oldValue = progButtonDebouncer.value();
         if (!progButtonDebouncer.debounce(digitalRead(progPin), 50) && oldValue)
         {

@@ -11,6 +11,11 @@
 #define SBLIB_IOPORTS_H_
 
 #include <cstdint>
+#include <sblib/platform_detect.h>
+
+#if defined(SBLIB_PLATFORM_RP2350) && defined(PIO0)
+#   error "The CMSIS device header RP2350.h defines PIO0..PIO2 and cannot be used together with the sblib"
+#endif
 
 /**
  * Digital ports.
@@ -86,6 +91,7 @@ enum PortFunctionManipulator : uint32_t
 #define FUNC2(x) ((x) << PF2_SHIFT)
 #define FUNC3(x) ((x) << PF3_SHIFT)
 
+#if defined(SBLIB_PLATFORM_LPC11XX)
 /**
  * Port pins.
  *
@@ -252,6 +258,64 @@ enum AnalogChannel : uint8_t
     AD6 = 6, //!< Analog channel 6 (this is pin PIO1_10)
     AD7 = 7, //!< Analog channel 7 (this is pin PIO1_11)
 };
+
+#elif defined(SBLIB_PLATFORM_RP2350)
+#   undef FUNC0
+#   undef FUNC1
+#   undef FUNC2
+#   undef FUNC3
+
+/**
+ * Port pins of the RP2350 / RP2354.
+ *
+ * The value of a pin is its GPIO number, so the bits are used as with the LPC11xx:
+ * Bit 0-4:   pin (0..31) within the 32 bit GPIO bank
+ * Bit 5-6:   "port" = GPIO bank (GPIO0..31 -> 0, GPIO32..47 -> 1)
+ * There is no function information encoded. The pin function is selected with
+ * @ref PinModeFunc in @ref pinMode.
+ *
+ * QFN-60 packages (RP2350A, e.g. Pico 2) have GPIO0..29, QFN-80 packages
+ * (RP2350B, RP2354B) GPIO0..47.
+ *
+ * The LPC11xx names PIOx_y are intentionally not available. A board header maps the
+ * functions of a controller board (bus RX/TX, programming button, I/Os) to GPIOs,
+ * see sblib/io_pin_names.h.
+ */
+enum PortPin : uint32_t
+{
+    GPIO0 = 0,   GPIO1 = 1,   GPIO2 = 2,   GPIO3 = 3,   GPIO4 = 4,   GPIO5 = 5,   GPIO6 = 6,   GPIO7 = 7,
+    GPIO8 = 8,   GPIO9 = 9,   GPIO10 = 10, GPIO11 = 11, GPIO12 = 12, GPIO13 = 13, GPIO14 = 14, GPIO15 = 15,
+    GPIO16 = 16, GPIO17 = 17, GPIO18 = 18, GPIO19 = 19, GPIO20 = 20, GPIO21 = 21, GPIO22 = 22, GPIO23 = 23,
+    GPIO24 = 24, GPIO25 = 25, GPIO26 = 26, GPIO27 = 27, GPIO28 = 28, GPIO29 = 29, GPIO30 = 30, GPIO31 = 31,
+    GPIO32 = 32, GPIO33 = 33, GPIO34 = 34, GPIO35 = 35, GPIO36 = 36, GPIO37 = 37, GPIO38 = 38, GPIO39 = 39,
+    GPIO40 = 40, GPIO41 = 41, GPIO42 = 42, GPIO43 = 43, GPIO44 = 44, GPIO45 = 45, GPIO46 = 46, GPIO47 = 47,
+
+    /**
+     * Pin not connected / not available on a board (e.g. PIN_VBUS without bus voltage measurement).
+     * digitalWrite() and digitalRead() ignore it, as do all pins >= NUM_BANK0_GPIOS.
+     */
+    GPIO_NC = 0x7f
+};
+
+/**
+ * Analog channels of the RP2350 ADC.
+ *
+ * QFN-60 (RP2350A, Pico 2): AD0..AD3 = GPIO26..29.
+ * QFN-80 (RP2350B, RP2354B): AD0..AD7 = GPIO40..47.
+ * The internal temperature sensor is not part of this enum.
+ */
+enum AnalogChannel : uint8_t
+{
+    AD0 = 0, //!< Analog channel 0 (GPIO26 on QFN-60, GPIO40 on QFN-80)
+    AD1 = 1, //!< Analog channel 1 (GPIO27 on QFN-60, GPIO41 on QFN-80)
+    AD2 = 2, //!< Analog channel 2 (GPIO28 on QFN-60, GPIO42 on QFN-80)
+    AD3 = 3, //!< Analog channel 3 (GPIO29 on QFN-60, GPIO43 on QFN-80)
+    AD4 = 4, //!< Analog channel 4 (GPIO44, QFN-80 only)
+    AD5 = 5, //!< Analog channel 5 (GPIO45, QFN-80 only)
+    AD6 = 6, //!< Analog channel 6 (GPIO46, QFN-80 only)
+    AD7 = 7, //!< Analog channel 7 (GPIO47, QFN-80 only)
+};
+#endif /* SBLIB_PLATFORM_RP2350 */
 
 /**
  * Find the function number for the function of a pin.

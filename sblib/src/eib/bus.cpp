@@ -20,6 +20,62 @@
 #include <sblib/eib/bus_debug.h>
 #include <sblib/eib/bcu_const.h>
 
+#if defined(SBLIB_RP2350_TIMER_STATS)
+#   include <hardware/timer.h>
+#   include <hardware/structs/watchdog.h>
+
+namespace
+{
+    volatile BusPauseStats pauseStats = {};
+
+    constexpr uint32_t PauseRecordMagic = 0x50415553; // "PAUS"
+
+    // Keep the longest pause of this run in watchdog scratch 0..3 (survives a watchdog reboot)
+    void recordPause(const uint32_t durationUs, const uint32_t iterations, const uint8_t entryState,
+                     const uint8_t stuckState)
+    {
+        ++pauseStats.calls;
+        pauseStats.lastUs = durationUs;
+        if (durationUs < pauseStats.maxUs)
+        {
+            return;
+        }
+
+        pauseStats.maxUs = durationUs;
+        pauseStats.maxIterations = iterations;
+        pauseStats.maxEntryState = entryState;
+        pauseStats.maxStuckState = stuckState;
+
+        watchdog_hw->scratch[0] = PauseRecordMagic;
+        watchdog_hw->scratch[1] = durationUs;
+        watchdog_hw->scratch[2] = iterations;
+        watchdog_hw->scratch[3] = entryState | (stuckState << 8) | (pauseStats.calls << 16);
+    }
+} // namespace
+
+const volatile BusPauseStats& busPauseStats()
+{
+    return pauseStats;
+}
+
+bool busPauseStatsPreviousRun(BusPauseStats& out)
+{
+    if (watchdog_hw->scratch[0] != PauseRecordMagic)
+    {
+        return false;
+    }
+
+    out.maxUs = watchdog_hw->scratch[1];
+    out.maxIterations = watchdog_hw->scratch[2];
+    out.maxEntryState = watchdog_hw->scratch[3] & 0xff;
+    out.maxStuckState = (watchdog_hw->scratch[3] >> 8) & 0xff;
+    out.calls = watchdog_hw->scratch[3] >> 16;
+    out.lastUs = 0;
+    watchdog_hw->scratch[0] = 0;
+    return true;
+}
+#endif
+
 
 // constructor for Bus object. Initialize basic interface parameter to bus and set SM to IDLE
 Bus::Bus(AddrTables* addrTable, Timer& aTimer, const uint32_t& aRxPin, const uint32_t& aTxPin,
@@ -117,9 +173,22 @@ void Bus::begin(const uint16_t physicalAddress)
 void Bus::pause(const bool waitForTelegramSent)
 {
     auto paused = false;
+#if defined(SBLIB_RP2350_TIMER_STATS)
+    const uint32_t startUs = time_us_32();
+    const auto entryState = static_cast<uint8_t>(state);
+    uint8_t stuckState = 0xff;
+    uint32_t iterations = 0;
+#endif
 
     while (!paused)
     {
+#if defined(SBLIB_RP2350_TIMER_STATS)
+        ++iterations;
+        if (stuckState == 0xff && (time_us_32() - startUs) > 100000)
+        {
+            stuckState = static_cast<uint8_t>(state);
+        }
+#endif
         // Need to be atomic here, otherwise we could transition to a non-pausable state after we've
         // determined it's possible to pause.
         noInterrupts();
@@ -143,6 +212,9 @@ void Bus::pause(const bool waitForTelegramSent)
 
         interrupts();
     }
+#if defined(SBLIB_RP2350_TIMER_STATS)
+    recordPause(time_us_32() - startUs, iterations, entryState, stuckState);
+#endif
 }
 
 void Bus::resume()
