@@ -9,6 +9,7 @@
 #
 # Linux, official Arm GNU Toolchain 13.2.rel1 (same GCC as MCUXpresso 24.9.25): host tests
 # (lib-test-cases x64, test/rp2350-host), RP2350 examples, out8-bcu1 RP2350 variants.
+# The job is skipped in private repositories, which bring their own CI.
 name: rp235x-ci
 
 on:
@@ -37,6 +38,7 @@ env:
 jobs:
   cloud:
     name: cloud (Linux, host tests + RP2350)
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
