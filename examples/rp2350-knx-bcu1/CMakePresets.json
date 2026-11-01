@@ -1,0 +1,39 @@
+{
+    "version": 8,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 28,
+        "patch": 3
+    },
+    "configurePresets": [
+        {
+            "name": "rp2350-pico2",
+            "displayName": "RP2350 (Pico 2 test board)",
+            "description": "external Pico SDK 2.2.0 from PICO_SDK_PATH, toolchain from ARM_TOOLCHAIN_PATH or MCUXPRESSO_TOOLCHAIN_PATH",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/cmake-build/${presetName}",
+            "cacheVariables": {
+                "PICO_SDK_PATH": "$env{PICO_SDK_PATH}",
+                "SBLIB_MCU": "RP2350",
+                "PICO_PLATFORM": "rp2350-arm-s",
+                "PICO_BOARD": "pico2",
+                "SBLIB_BOARD": "pico2_testboard"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "debug-rp2350-pico2", "configurePreset": "rp2350-pico2", "configuration": "Debug" },
+        { "name": "release-rp2350-pico2", "configurePreset": "rp2350-pico2", "configuration": "Release" }
+    ],
+    "workflowPresets": [
+        {
+            "name": "build-rp2350-pico2-all",
+            "displayName": "Build RP2350 Pico 2 (all configs)",
+            "steps": [
+                { "type": "configure", "name": "rp2350-pico2" },
+                { "type": "build", "name": "release-rp2350-pico2" },
+                { "type": "build", "name": "debug-rp2350-pico2" }
+            ]
+        }
+    ]
+}
