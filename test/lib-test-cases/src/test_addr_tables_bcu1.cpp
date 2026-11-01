@@ -93,7 +93,7 @@ TEST_CASE("BCU1 address table count includes the individual address", "[addr_tab
 
     SECTION("maximum encoded count in synthetic extended backing")
     {
-        // 255 is not a valid BCU1 EEPROM layout, this only checks the loop bound
+        // 255 cannot fit in BCU1 EEPROM and must be rejected before scanning.
         constexpr int n = 255;
         f.eeprom.addrTabSize() = n;
         for (int i = 1; i < n; ++i)
@@ -101,7 +101,7 @@ TEST_CASE("BCU1 address table count includes the individual address", "[addr_tab
             f.address(i, 0x3000 + i);
         }
         f.address(n, 0xb66b);
-        CHECK(f.table.indexOfAddr(0x3000 + n - 1) == n - 1);
+        CHECK(f.table.indexOfAddr(0x3000 + n - 1) == -1);
         CHECK(f.table.indexOfAddr(0xb66b) == -1);
     }
 }

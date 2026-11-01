@@ -14,6 +14,11 @@ int AddrTablesBCU1::indexOfAddr(const int addr)
 
     if (tab)
         num = *tab;
+    // BCU1 addresses start at 0x17; the final EEPROM byte is the checksum.
+    if (tab && num > (static_cast<int>(userEeprom->size()) - 0x17 - 1) / 2)
+    {
+        return -1;
+    }
     tab += 3;
 
     const int addrHigh = addr >> 8;

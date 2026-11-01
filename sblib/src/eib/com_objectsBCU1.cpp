@@ -172,16 +172,31 @@ uint8_t* ComObjectsBCU1::objectFlagsTable() // stored in RAM
     return ((BcuDefault*)bcu)->userMemoryPtr(*objCfgTablePtr);
 }
 
-inline const ComConfig& ComObjectsBCU1::objectConfig(const int objno) { return objectConfigBCU1(objno)->baseConfig; }
+const ComConfig& ComObjectsBCU1::objectConfig(const int objno)
+{
+    const ComConfigBCU1* cfg = objectConfigBCU1(objno);
+    if (cfg == nullptr)
+    {
+        static constexpr ComConfig disabledConfig = {0, 0};
+        return disabledConfig;
+    }
+    return cfg->baseConfig;
+}
 
 inline const ComConfigBCU1* ComObjectsBCU1::objectConfigBCU1(const int objno)
 {
     const uint8_t* objConfigTable = objectConfigTable();
-    if (objConfigTable == nullptr)
+    if (objConfigTable == nullptr || objno < 0 || objno >= *objConfigTable)
     {
         return (nullptr);
     }
-    return (const ComConfigBCU1*) (objConfigTable + 1 + sizeof(ComConfigBCU1::DataPtrType) + objno * sizeof(ComConfigBCU1));
+    const auto* eeprom = static_cast<BcuDefault*>(bcu)->userEeprom;
+    const uint32_t offset = 1 + sizeof(ComConfigBCU1::DataPtrType) + objno * sizeof(ComConfigBCU1);
+    if (eeprom->commsTabPtr() + offset + sizeof(ComConfigBCU1) > eeprom->size())
+    {
+        return nullptr;
+    }
+    return reinterpret_cast<const ComConfigBCU1*>(objConfigTable + offset);
 }
 
 void ComObjectsBCU1::printObjectConfigTable()
