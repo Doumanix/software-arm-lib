@@ -1,0 +1,161 @@
+# RP235x CI for the public forks (software-arm-lib and software-arm-incubation), identical copy in
+# both repositories as .github/workflows/rp235x-ci.yml. GitHub-hosted runners only.
+#
+# Layout (as the out8 presets expect it):
+#   apps/                    software-arm-incubation
+#   apps/software-arm-lib/   software-arm-lib (external Pico SDK below)
+# The repository that triggered the run is checked out at the pushed commit, the other one at
+# the branch RP235x-compatibility of the same owner.
+#
+# Linux, official Arm GNU Toolchain 13.2.rel1 (same GCC as MCUXpresso 24.9.25): host tests
+# (lib-test-cases x64, test/rp2350-host), RP2350 examples, out8-bcu1 RP2350 variants.
+name: rp235x-ci
+
+on:
+  push:
+    branches: [RP235x-compatibility, 'ci/**']
+  pull_request:
+    branches: [RP235x-compatibility]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  LIB_REPO: ${{ github.repository_owner }}/software-arm-lib
+  APP_REPO: ${{ github.repository_owner }}/software-arm-incubation
+  LIB_REF: ${{ endsWith(github.repository, '/software-arm-lib') && github.sha || 'RP235x-compatibility' }}
+  APP_REF: ${{ endsWith(github.repository, '/software-arm-incubation') && github.sha || 'RP235x-compatibility' }}
+  ARM_GNU_VERSION: 13.2.rel1
+  PICOTOOL_VERSION: 2.2.0
+  PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
+
+jobs:
+  cloud:
+    name: cloud (Linux, host tests + RP2350)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout apps
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.APP_REPO }}
+          ref: ${{ env.APP_REF }}
+          path: apps
+      - name: Checkout sblib
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.LIB_REPO }}
+          ref: ${{ env.LIB_REF }}
+          path: apps/software-arm-lib
+      - name: Cache Pico SDK 2.2.0
+        id: cache-pico-sdk
+        uses: actions/cache@v4
+        with:
+          path: pico-sdk
+          key: pico-sdk-a1438dff1d38bd9c65dbd693f0e5db4b9ae91779-${{ runner.os }}-v1
+      - name: Checkout external Pico SDK 2.2.0
+        if: steps.cache-pico-sdk.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.2.0
+          path: pico-sdk
+          submodules: false
+      - name: Verify Pico SDK commit
+        shell: bash
+        run: test "$(git -C pico-sdk rev-parse HEAD)" = a1438dff1d38bd9c65dbd693f0e5db4b9ae91779
+      - name: Versions
+        run: |
+          echo "apps $(git -C apps rev-parse --short HEAD), sblib $(git -C apps/software-arm-lib rev-parse --short HEAD)"
+          git -C pico-sdk rev-parse HEAD
+
+      - name: Install ninja
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build
+
+      - name: Cache Arm GNU Toolchain
+        id: cache-arm
+        uses: actions/cache@v4
+        with:
+          path: ~/arm-gnu-toolchain
+          key: arm-gnu-${{ env.ARM_GNU_VERSION }}-x86_64-v1
+      - name: Download Arm GNU Toolchain
+        if: steps.cache-arm.outputs.cache-hit != 'true'
+        run: |
+          url="https://developer.arm.com/-/media/Files/downloads/gnu/${ARM_GNU_VERSION}/binrel/arm-gnu-toolchain-${ARM_GNU_VERSION}-x86_64-arm-none-eabi.tar.xz"
+          mkdir -p ~/arm-gnu-toolchain
+          curl -fsSL "$url" | tar -xJ -C ~/arm-gnu-toolchain --strip-components=1
+      - name: Toolchain environment
+        run: |
+          echo "ARM_TOOLCHAIN_PATH=$HOME/arm-gnu-toolchain" >> "$GITHUB_ENV"
+          ~/arm-gnu-toolchain/bin/arm-none-eabi-gcc --version | head -1
+
+      - name: Cache picotool
+        id: cache-picotool
+        uses: actions/cache@v4
+        with:
+          path: ~/picotool
+          key: picotool-${{ env.PICOTOOL_VERSION }}-ubuntu-24.04-v1
+      - name: Build picotool
+        if: steps.cache-picotool.outputs.cache-hit != 'true'
+        run: |
+          git clone -q --depth 1 -b "$PICOTOOL_VERSION" https://github.com/raspberrypi/picotool.git "$RUNNER_TEMP/picotool-src"
+          cmake -S "$RUNNER_TEMP/picotool-src" -B "$RUNNER_TEMP/picotool-build" -G Ninja \
+            -DPICO_SDK_PATH="$PICO_SDK_PATH" \
+            -DPICOTOOL_NO_LIBUSB=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/picotool"
+          cmake --build "$RUNNER_TEMP/picotool-build"
+          cmake --install "$RUNNER_TEMP/picotool-build"
+      - name: picotool environment
+        run: |
+          cfg=$(find ~/picotool -name picotoolConfig.cmake | head -1)
+          test -n "$cfg" || { echo "picotoolConfig.cmake not found"; exit 1; }
+          echo "PICOTOOL_DIR=$(dirname "$cfg")" >> "$GITHUB_ENV"
+
+      - name: Host tests (lib-test-cases x64)
+        working-directory: apps/software-arm-lib/test/lib-test-cases
+        run: |
+          cmake --preset x64
+          cmake --build --preset debug-x64
+          ctest --preset test-debug-x64 --output-on-failure
+      - name: Host tests (RP2350 port, test/rp2350-host)
+        working-directory: apps/software-arm-lib/test/rp2350-host
+        run: |
+          cmake --workflow --preset host-test
+          for t in cmake-build/host/rp2350_*_tests; do
+            [ -x "$t" ] && echo "$(basename "$t"): $("$t" | tail -2 | head -1)" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: RP2350 examples
+        run: |
+          for ex in rp2350-smoke rp2350-knx-bcu1; do
+            echo "::group::$ex"
+            (cd "apps/software-arm-lib/examples/$ex" && cmake --workflow --preset build-rp2350-pico2-all)
+            echo "::endgroup::"
+          done
+      - name: out8-bcu1 RP2350
+        working-directory: apps/actuators/outputs/out8-bcu1
+        run: cmake --workflow --preset build-rp2350-pico2-all
+
+      - name: Size summary
+        if: always()
+        run: |
+          {
+            echo "### RP2350 Release (Arm GNU ${ARM_GNU_VERSION})"
+            echo '```'
+            find apps -path '*cmake-build/rp2350-pico2/Release/*.elf' -print0 | sort -z | \
+              xargs -0 -r "$ARM_TOOLCHAIN_PATH/bin/arm-none-eabi-size" | sed "s|$GITHUB_WORKSPACE/||"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload RP2350 Release images
+        uses: actions/upload-artifact@v4
+        with:
+          name: rp2350-release
+          path: |
+            apps/**/cmake-build/rp2350-pico2/Release/*.elf
+            apps/**/cmake-build/rp2350-pico2/Release/*.uf2
+          retention-days: 14
+          if-no-files-found: warn
