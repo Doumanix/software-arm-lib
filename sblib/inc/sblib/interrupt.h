@@ -69,6 +69,14 @@ void interrupts();
 void waitForInterrupt();
 
 /**
+ * Wait for an enabled interrupt with PRIMASK set, preserving the mask on return.
+ * Call from privileged Thread mode with no other priority mask blocking the wake IRQ.
+ * The caller must re-enable interrupts to dispatch the handler and recheck its condition.
+ * WFI may also return without an interrupt. This does not configure peripheral sleep clocks.
+ */
+void waitForInterruptMasked();
+
+/**
  * Enable an interrupt.
  *
  * @param interruptType - the interrupt to enable: TIMER_16_0_IRQn, I2C_IRQn, ...
@@ -155,6 +163,12 @@ FORCE_INLINE void interrupts()
 
 FORCE_INLINE void waitForInterrupt()
 {
+    __WFI();
+}
+
+FORCE_INLINE void waitForInterruptMasked()
+{
+    __DSB();
     __WFI();
 }
 

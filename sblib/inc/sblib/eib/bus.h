@@ -55,6 +55,9 @@ public:
     /**
      * Waits for a safe time to pause bus access, then pauses bus access.
      *
+     * @pre Call from privileged Thread mode with interrupts enabled, no other priority mask
+     *      blocking bus interrupts, and the bus timer running with its wake sources enabled.
+     *      This method enables interrupts on return; it is not a nested critical section.
      * @param waitForTelegramSent - Whether to wait for an enqueued telegram to be sent or not.
      *                              When passing false, the enqueued telegram is sent out after resume().
      */

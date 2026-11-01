@@ -134,9 +134,14 @@ void Bus::pause(const bool waitForTelegramSent)
             state = INIT;
             paused = true;
         }
+        else
+        {
+            // Keep PRIMASK set between the condition check and WFI. A pending enabled IRQ
+            // wakes the core without running its handler until interrupts() below.
+            waitForInterruptMasked();
+        }
 
         interrupts();
-        waitForInterrupt();
     }
 }
 
