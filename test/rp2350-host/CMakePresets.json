@@ -1,0 +1,53 @@
+{
+    "version": 8,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 28,
+        "patch": 3
+    },
+    "configurePresets": [
+        {
+            "name": "host",
+            "displayName": "Host (RP2350 port unit tests)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/cmake-build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "host",
+            "configurePreset": "host"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "host",
+            "configurePreset": "host",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "host-test",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "host"
+                },
+                {
+                    "type": "build",
+                    "name": "host"
+                },
+                {
+                    "type": "test",
+                    "name": "host"
+                }
+            ]
+        }
+    ]
+}
