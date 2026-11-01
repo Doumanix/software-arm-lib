@@ -1,6 +1,6 @@
 # TP1 timing measurements on the RP2350 test board
 
-Evidence through 2026-10-26; out8-bcu1 on Pico 2, physical address 1.1.101.
+Evidence through 2026-11-01; out8-bcu1 on Pico 2, physical address 1.1.101.
 These are measurements of particular images and captured intervals, not a KNX certification result.
 Image references below are prefixes of the full **ELF SHA-256** values in the identity table.
 
@@ -23,15 +23,20 @@ Raster error is a phase measurement; a separately calibrated bit-rate measuremen
 
 ## Clean captures and historical correction
 
-Values are **minimum / mean / maximum**, in µs. Each clean capture contains 34 own ACKs.
+Values are **minimum / mean / maximum**, in µs. The two older columns contain 34 own ACKs each; the 2026-11-01 column combines three captures (see below).
 The light load is DeviceInfo plus group 0/0/100 on/off during a 20 s recording.
 
-| Quantity | Local target | 2026-10-23, GPIO, a60f243c | 2026-10-26, PIO, e70895f7 |
-|---|---|---|---|
-| Normal TX zero-bit pulse | 35 ± 2 | 34.3 / 35.03 / 37.0 (2344 pulses) | 35.0 / 35.01 / 35.1 (2404 pulses) |
-| Absolute phase error on 104 µs raster | ≤ 2 | 0.0 / 0.12 / 0.9 | 0.0 / 0.11 / 0.2 |
-| Character start spacing | 1353 ± 3 | 1352.4 / 1353.28 / 1353.3 | 1353.2 / 1353.29 / 1353.3 |
-| Own ACK after received stop bit | 1563 ± 5 | 1561.1 / 1561.97 / 1563.0 | 1561.1 / 1561.52 / 1562.1 |
+| Quantity | Local target | 2026-10-23, GPIO, a60f243c | 2026-10-26, PIO, e70895f7 | 2026-11-01, PIO, dcfd6eb9 |
+|---|---|---|---|---|
+| Normal TX zero-bit pulse | 35 ± 2 | 34.3 / 35.03 / 37.0 (2344 pulses) | 35.0 / 35.01 / 35.1 (2404 pulses) | 35.0 / 35.01 / 35.1 (17,668 pulses) |
+| Absolute phase error on 104 µs raster | ≤ 2 | 0.0 / 0.12 / 0.9 | 0.0 / 0.11 / 0.2 | 0.0 / 0.11 / 0.2 |
+| Character start spacing | 1353 ± 3 | 1352.4 / 1353.28 / 1353.3 | 1353.2 / 1353.29 / 1353.3 | 1353.2 / 1353.29 / 1353.3 |
+| Own ACK after received stop bit | 1563 ± 5 | 1561.1 / 1561.97 / 1563.0 | 1561.1 / 1561.52 / 1562.1 | 1561.1 / 1561.6 (median) / 1563.1 (198 ACKs) |
+
+The 2026-11-01 column combines three 20 s captures (coverage 0.996 each, no decode errors, no arbitration loss)
+with DeviceInfo and group 0/0/100 on/off. The image is the current release; PIO was verified on the ELF symbols.
+The idle time before our own frames was at least 5212 µs after the previous stop bit (234 frames; 50 bit times =
+5200 µs). One gateway NACK caused one repetition 5329 µs later, which was acknowledged.
 
 The earlier GPIO image 8bb21010 (2026-10-23, same light-load setup) had pulse width
 33.2 / 36.68 / 41.2 µs, maximum raster error 7.9 µs, character spacing
@@ -94,3 +99,4 @@ capture, raw file and source line. No new hardware measurement was made for this
 | 31dc9046 | GPIO | 31dc904614dec2a8c63f52a6ab3789c48bc01a57132915e144b11773881f6e6e |
 | 85fe73ae | GPIO | 85fe73ae38c528f19a36988474ca421d667a7a3a4f4e2e94acea6f13e58faf59 |
 | 649bf01e | PIO diagnostics | 649bf01e55f2b9158095fe3753940f162856ce9e04fc4331615994bc3ca35fa0 |
+| dcfd6eb9 | PIO | dcfd6eb941bdca3b23cabbf6f27350346c84a11d4fd78dc3953e4edc6b6245ef |
