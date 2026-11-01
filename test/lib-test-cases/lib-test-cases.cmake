@@ -14,6 +14,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_digital_pin.cpp
         src/test_eeprom.cpp
         src/test_hashing.cpp
+        src/test_interrupt_enabled.cpp
         src/test_ioports.cpp
         src/test_ioports_get_pin_function_number.cpp
         src/test_knx_lpdu.cpp

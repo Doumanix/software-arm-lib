@@ -190,7 +190,7 @@ FORCE_INLINE bool getInterruptEnabled(const IRQn_Type interruptType)
 {
     if (interruptType >= 0)
     {
-        return ((NVIC->ICER[0] >> (interruptType & 0x1f)) == 1);
+        return (NVIC->ISER[0] & (uint32_t{1} << (interruptType & 0x1f))) != 0;
     }
 
     fatalError();
