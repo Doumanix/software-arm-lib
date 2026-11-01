@@ -114,6 +114,43 @@
                 "SBLIB_LOGGING": "OFF",
                 "SBLIB_LOGGING_DIR": "${sourceDir}/../logging"
             }
+        },
+        {
+            "name": "default-toolchain-arm-none-eabi-generic",
+            "description": "Sets the generic arm-none-eabi toolchain (no MCUXpresso installation required). Toolchain from ARM_TOOLCHAIN_PATH, MCUXPRESSO_TOOLCHAIN_PATH or PATH",
+            "hidden": true,
+            "toolchainFile": "${sourceDir}/../cmake/toolchains/arm-none-eabi.cmake"
+        },
+        {
+            "name": "arm-generic",
+            "displayName": "ARM Target (generic toolchain)",
+            "description": "LPC1115 with the generic arm-none-eabi toolchain, build directory and Ninja Multi Config generator",
+            "hidden": false,
+            "inherits": [
+                "default-build-directory",
+                "default-generator-ninja-multi-config",
+                "default-toolchain-arm-none-eabi-generic"
+            ],
+            "cacheVariables": {
+                "SBLIB_MCU": "LPC1115"
+            }
+        },
+        {
+            "name": "rp2350-pico2",
+            "displayName": "RP2350 Target (Pico 2 test board)",
+            "description": "RP2350 with the external Pico SDK 2.2.0 from PICO_SDK_PATH. Toolchain from ARM_TOOLCHAIN_PATH or MCUXPRESSO_TOOLCHAIN_PATH, picotool from PICOTOOL_DIR",
+            "hidden": false,
+            "inherits": [
+                "default-build-directory",
+                "default-generator-ninja-multi-config"
+            ],
+            "cacheVariables": {
+                "PICO_SDK_PATH": "$env{PICO_SDK_PATH}",
+                "SBLIB_MCU": "RP2350",
+                "PICO_PLATFORM": "rp2350-arm-s",
+                "PICO_BOARD": "pico2",
+                "SBLIB_BOARD": "pico2_testboard"
+            }
         }
     ],
     "buildPresets": [
@@ -212,6 +249,30 @@
             "targets": [
                 "sblib_x86"
             ]
+        },
+        {
+            "name": "debug-arm-generic",
+            "configurePreset": "arm-generic",
+            "configuration": "Debug",
+            "displayName": "ARM Target Debug Build (generic toolchain)",
+            "description": "Build ARM target in Debug configuration",
+            "hidden": false,
+            "verbose": true,
+            "targets": [
+                "sblib_arm"
+            ]
+        },
+        {
+            "name": "release-arm-generic",
+            "configurePreset": "arm-generic",
+            "configuration": "Release",
+            "displayName": "ARM Target Release Build (generic toolchain)",
+            "description": "Build ARM target in Release configuration",
+            "hidden": false,
+            "verbose": true,
+            "targets": [
+                "sblib_arm"
+            ]
         }
     ],
     "workflowPresets": [
@@ -299,6 +360,36 @@
                 {
                     "type": "build",
                     "name": "debug-arm-logging"
+                }
+            ]
+        },
+        {
+            "name": "build-arm-generic-all",
+            "description": "Build ARM target with the generic toolchain in Debug and Release configurations",
+            "displayName": "Build ARM generic toolchain (all configs)",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "arm-generic"
+                },
+                {
+                    "type": "build",
+                    "name": "release-arm-generic"
+                },
+                {
+                    "type": "build",
+                    "name": "debug-arm-generic"
+                }
+            ]
+        },
+        {
+            "name": "configure-rp2350-pico2",
+            "description": "Configure sblib for RP2350 (Pico SDK setup check, no library target yet)",
+            "displayName": "Configure RP2350 Pico 2",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "rp2350-pico2"
                 }
             ]
         }

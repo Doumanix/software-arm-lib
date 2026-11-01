@@ -1,6 +1,42 @@
 cmake_minimum_required(VERSION 3.28)
 
+# Target MCU. LPC1115 is the default and behaves exactly as before.
+set(SBLIB_MCU "LPC1115" CACHE STRING "Target microcontroller (LPC1115, RP2350)")
+set_property(CACHE SBLIB_MCU PROPERTY STRINGS LPC1115 RP2350)
+if(NOT SBLIB_MCU MATCHES "^(LPC1115|RP2350)$")
+    message(FATAL_ERROR "Unknown SBLIB_MCU '${SBLIB_MCU}'. Valid values: LPC1115, RP2350")
+endif()
+
+# RP2350: the Pico SDK must be imported before the first project() call.
+# If sblib is built as part of an application, the application does this
+# (include cmake/rp2350/pico_sdk_setup.cmake before its project()).
+if(SBLIB_MCU STREQUAL "RP2350" AND NOT DEFINED PROJECT_NAME)
+    include(${CMAKE_CURRENT_LIST_DIR}/../cmake/rp2350/pico_sdk_setup.cmake)
+endif()
+
 project(sblib LANGUAGES CXX VERSION 2.10)
+
+if(SBLIB_MCU STREQUAL "RP2350")
+    enable_language(C ASM)
+    if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+        pico_sdk_init()
+    elseif(NOT COMMAND pico_sdk_init)
+        message(FATAL_ERROR "SBLIB_MCU=RP2350: include cmake/rp2350/pico_sdk_setup.cmake before project() of the application")
+    endif()
+    # Board (pin mapping, see inc/sblib/io_pin_names.h). The default is set in pico_sdk_setup.cmake.
+    if(SBLIB_BOARD STREQUAL "pico2_testboard")
+        set(SBLIB_BOARD_DEFINITION SBLIB_BOARD_RP2350_PICO2_TESTBOARD)
+    elseif(SBLIB_BOARD STREQUAL "custom")
+        if(NOT SBLIB_BOARD_HEADER)
+            message(FATAL_ERROR "SBLIB_BOARD=custom requires SBLIB_BOARD_HEADER (board header file name, found via the include path)")
+        endif()
+        set(SBLIB_BOARD_DEFINITION "SBLIB_BOARD_HEADER=\"${SBLIB_BOARD_HEADER}\"")
+    else()
+        message(FATAL_ERROR "Unknown SBLIB_BOARD '${SBLIB_BOARD}'. Valid values: pico2_testboard, custom")
+    endif()
+    message(NOTICE "Configuring ${PROJECT_NAME} for RP2350 (SBLIB_BOARD=${SBLIB_BOARD}, PICO_PLATFORM=${PICO_PLATFORM}, PICO_BOARD=${PICO_BOARD}).")
+    return()
+endif()
 
 set(CMAKE_VERBOSE_MAKEFILE ON CACHE BOOL "Enable verbose output from the build system")
 set(CMAKE_C_STANDARD 17)

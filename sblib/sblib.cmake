@@ -24,6 +24,7 @@ set(SBLIB_CORE_SRC
         inc/sblib/murmur_hash_3.h
         inc/sblib/onewire.h
         inc/sblib/platform.h
+        inc/sblib/platform_detect.h
         inc/sblib/print.h
         inc/sblib/ring_buffer.h
         inc/sblib/serial_registers.h
