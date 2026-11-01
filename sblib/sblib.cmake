@@ -232,7 +232,9 @@ set(SBLIB_SRC
 set(SBLIB_RP2350_PLATFORM_SRC
         inc/sblib/hardware/gpio_rp2350_pico2_testboard.h
         inc/sblib/platform_detect.h
+        linker/rp2350_storage.ld
         src/rp2350/digital_pin.cpp
+        src/rp2350/iap.cpp
         src/rp2350/platform.cpp
         src/rp2350/time.cpp
 )

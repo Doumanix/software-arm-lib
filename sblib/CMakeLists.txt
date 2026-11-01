@@ -65,6 +65,18 @@ if(SBLIB_MCU STREQUAL "RP2350")
         target_link_libraries(sblib_rp2350 PUBLIC hardware_dma hardware_pio)
     endif()
 
+    # Persistent storage at the end of the flash (UserEeprom, MemMapper), see linker/rp2350_storage.ld
+    set(SBLIB_RP2350_STORAGE_SIZE 16384 CACHE STRING "Size of the persistent storage at the end of the flash in bytes (multiple of 4096)")
+    math(EXPR _storage_rest "${SBLIB_RP2350_STORAGE_SIZE} % 4096")
+    if(SBLIB_RP2350_STORAGE_SIZE LESS 4096 OR NOT _storage_rest EQUAL 0)
+        message(FATAL_ERROR "SBLIB_RP2350_STORAGE_SIZE (${SBLIB_RP2350_STORAGE_SIZE}) must be a multiple of 4096 and at least 4096")
+    endif()
+    set(_storage_ld ${CMAKE_CURRENT_SOURCE_DIR}/linker/rp2350_storage.ld)
+    target_link_options(sblib_rp2350 INTERFACE
+        "LINKER:--defsym=__sblib_storage_size=${SBLIB_RP2350_STORAGE_SIZE}"
+        "LINKER:-T,${_storage_ld}"
+    )
+    set_property(TARGET sblib_rp2350 APPEND PROPERTY INTERFACE_LINK_DEPENDS ${_storage_ld})
     return()
 endif()
 
