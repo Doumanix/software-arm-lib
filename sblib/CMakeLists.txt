@@ -35,6 +35,36 @@ if(SBLIB_MCU STREQUAL "RP2350")
         message(FATAL_ERROR "Unknown SBLIB_BOARD '${SBLIB_BOARD}'. Valid values: pico2_testboard, custom")
     endif()
     message(NOTICE "Configuring ${PROJECT_NAME} for RP2350 (SBLIB_BOARD=${SBLIB_BOARD}, PICO_PLATFORM=${PICO_PLATFORM}, PICO_BOARD=${PICO_BOARD}).")
+    # The RP2350 platform sources of the sblib, see SBLIB_RP2350_SRC in sblib.cmake.
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    include(sblib.cmake)
+    add_library(sblib_rp2350 STATIC ${SBLIB_RP2350_SRC})
+    target_include_directories(sblib_rp2350 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+    option(SBLIB_RP2350_TIMER_STATS "Diagnostics: counters of the RP2350 timer emulation (timerEmulationStats())" OFF)
+    option(SBLIB_RP2350_PIO_BUS "KNX bus RX capture and TX pulses by PIO state machines (OFF: GPIO interrupt and alarm)" ON)
+    target_compile_definitions(sblib_rp2350 PUBLIC
+        ${SBLIB_BOARD_DEFINITION}
+        $<$<CONFIG:Release>:NDEBUG>
+        $<$<CONFIG:Debug>:DEBUG>
+        $<$<BOOL:${SBLIB_RP2350_TIMER_STATS}>:SBLIB_RP2350_TIMER_STATS>
+        $<$<BOOL:${SBLIB_RP2350_PIO_BUS}>:SBLIB_RP2350_PIO_BUS>
+    )
+    target_link_libraries(sblib_rp2350 PUBLIC
+        hardware_clocks
+        hardware_flash
+        hardware_sync
+        hardware_gpio
+        hardware_irq
+        hardware_timer
+        hardware_watchdog
+        pico_rand
+        pico_unique_id
+    )
+    if(SBLIB_RP2350_PIO_BUS)
+        target_link_libraries(sblib_rp2350 PUBLIC hardware_dma hardware_pio)
+    endif()
+
     return()
 endif()
 

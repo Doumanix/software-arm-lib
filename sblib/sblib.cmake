@@ -1,5 +1,6 @@
 set(SBLIB_CORE_SRC
         inc/sblib/hardware/gpio_lpc11xx.h
+        inc/sblib/hardware/gpio_rp2350_pico2_testboard.h
 #        inc/sblib/hardware/gpio_lpc11xx_fused_io.h
 #        inc/sblib/hardware/gpio_lpc11xx_gnax.h
         inc/sblib/internal/bootloader_commands.h
@@ -225,3 +226,44 @@ set(SBLIB_SRC
         ${SBLIB_KNX_SRC}
         ${SBLIB_PERIPHERIE_SRC}
 )
+
+# RP2350 (SBLIB_MCU=RP2350): all sblib sources, with the platform specific LPC11xx files
+# exchanged for the RP2350 files and the drivers that are not ported yet left out.
+set(SBLIB_RP2350_PLATFORM_SRC
+        inc/sblib/hardware/gpio_rp2350_pico2_testboard.h
+        inc/sblib/platform_detect.h
+        src/rp2350/digital_pin.cpp
+        src/rp2350/platform.cpp
+        src/rp2350/time.cpp
+)
+set(SBLIB_RP2350_EXCLUDED_SRC
+        # LPC11xx platform, replaced by src/rp2350
+        inc/sblib/hardware/gpio_lpc11xx.h
+        src/lpc11xx/digital_pin.cpp
+        src/lpc11xx/digital_pin_port.cpp
+        src/lpc11xx/digital_pin_pulse.cpp
+        src/lpc11xx/platform.cpp
+        src/iap.cpp
+        src/timer.cpp
+        # Drivers not ported to the RP2350 yet (porting phase W2: ADC, I2C, SPI, serial)
+        src/analog_pin.cpp
+        src/i2c.cpp
+        src/i2c/bh1750.cpp
+        src/i2c/CCS811.cpp
+        src/i2c/ds2482.cpp
+        src/i2c/ds3231.cpp
+        src/i2c/iaq-core.cpp
+        src/i2c/sensirion_gas_index_algorithm.cpp
+        src/i2c/SGP4x.cpp
+        src/i2c/SHT1x.cpp
+        src/i2c/SHT2x.cpp
+        src/i2c/SHT4x.cpp
+        src/lcd/graphical_eadogs.cpp
+        src/serial.cpp
+        src/serial0.cpp
+        src/soft_uart.cpp
+        src/spi.cpp
+)
+set(SBLIB_RP2350_SRC ${SBLIB_SRC} ${SBLIB_RP2350_PLATFORM_SRC})
+list(REMOVE_DUPLICATES SBLIB_RP2350_SRC)
+list(REMOVE_ITEM SBLIB_RP2350_SRC ${SBLIB_RP2350_EXCLUDED_SRC})
