@@ -237,6 +237,7 @@ set(SBLIB_RP2350_PLATFORM_SRC
         src/rp2350/iap.cpp
         src/rp2350/platform.cpp
         src/rp2350/time.cpp
+        src/rp2350/timer.cpp
 )
 set(SBLIB_RP2350_EXCLUDED_SRC
         # LPC11xx platform, replaced by src/rp2350
