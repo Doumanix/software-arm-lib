@@ -12,6 +12,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_addr_tables_bcu1.cpp
         src/test_bcu1_table_bounds.cpp
         src/test_addr_tables_bcu2.cpp
+        src/test_addr_tables_mask07xx.cpp
         src/test_bootloader_commands.cpp
         src/test_datapoint_types.cpp
         src/test_digital_pin.cpp
