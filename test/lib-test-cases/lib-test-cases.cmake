@@ -13,6 +13,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_datapoint_types.cpp
         src/test_digital_pin.cpp
         src/test_eeprom.cpp
+        src/test_user_eeprom_write_delay.cpp
         src/test_hashing.cpp
         src/test_interrupt_enabled.cpp
         src/test_ioports.cpp

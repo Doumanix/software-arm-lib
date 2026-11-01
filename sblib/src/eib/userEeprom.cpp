@@ -183,9 +183,8 @@ void UserEeprom::modified(const bool newModified)
 
 bool UserEeprom::writeDelayElapsed() const
 {
-    bool elapsed = userEepromModified;
-    elapsed |= ((int)millis() - (int)writeUserEepromTime) > 0;
-    return (elapsed);
+    const uint32_t timeSinceDeadline = millis() - writeUserEepromTime;
+    return userEepromModified && timeSinceDeadline != 0 && timeSinceDeadline < 0x80000000u;
 }
 
 bool UserEeprom::isModified() const
