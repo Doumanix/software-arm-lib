@@ -8,6 +8,8 @@
 
 #include <sblib/print.h>
 #include <vector>
+#include <climits>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 
