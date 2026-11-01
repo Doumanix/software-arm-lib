@@ -1,6 +1,6 @@
 /*
  *  pio_cycle_model.h - Cycle accurate model of one PIO state machine for the host tests of the PIO
- *                      programs of the timer emulation (SBLIB_RP2350_PIO_BUS, order 052).
+ *                      programs of the timer emulation (SBLIB_RP2350_PIO_BUS).
  *
  *  Executes the instructions the programs use, as described in the RP2350 datasheet (chapter PIO):
  *  JMP (all conditions), WAIT PIN, PUSH/PULL (block and noblock, PULL noblock of an empty FIFO copies X),
@@ -10,6 +10,8 @@
  *  program continues at the wrap target unless a jump was taken. One input pin and one output pin (the input
  *  can be the output pin itself, without the 2 cycles of input synchronisation).
  *  Other instructions throw: the programs must not use them.
+ *
+ *  @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as

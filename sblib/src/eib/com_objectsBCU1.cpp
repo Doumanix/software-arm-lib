@@ -3,6 +3,7 @@
  *
  *  Created on: 19.11.2021
  *      Author: dridders
+ *      Author: Doumanix <doumanix@gmx.de>
  */
 
 #include "sblib/eib/com_objectsBCU1.h"

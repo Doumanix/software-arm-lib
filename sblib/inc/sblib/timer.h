@@ -2,6 +2,7 @@
  *  timer.h - Timer manipulation and time functions.
  *
  *  Copyright (c) 2014 Stefan Taferner <stefan.taferner@gmx.at>
+ *  Copyright (c) 2026 Doumanix <doumanix@gmx.de>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as
@@ -783,7 +784,7 @@ struct TimerEmulationStats
     uint32_t rxIrqFirstEchoMaxUs; //!< longest RX edge interrupt during the first pulse of a telegram (own echo)
     uint32_t alarmHandlerMaxUs;   //!< longest call of the timer interrupt handler from the alarm interrupt
 
-    // Interrupt load of the timer emulation (order 052)
+    // Interrupt load of the timer emulation
     uint32_t txEdgeIrqs; //!< TX edge interrupts (bus PWM without SBLIB_RP2350_PIO_BUS)
     uint32_t rxEdgeIrqs; //!< RX edge interrupts: GPIO interrupts, with SBLIB_RP2350_PIO_BUS DMA interrupts
     uint32_t irqBusyUs;  //!< time in the alarm, TX edge and RX edge interrupts (a nested interrupt counts twice)

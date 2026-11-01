@@ -71,7 +71,7 @@ target_compile_options(rp2350_bus_tests PRIVATE -Wall -Wextra -Wno-unused-parame
 
 add_test(NAME rp2350_bus_tests COMMAND rp2350_bus_tests)
 
-# The same tests with the KNX bus by PIO (CMake option SBLIB_RP2350_PIO_BUS of the sblib, order 052)
+# The same tests with the KNX bus by PIO (CMake option SBLIB_RP2350_PIO_BUS of the sblib)
 foreach(name rp2350_host_tests rp2350_bus_tests)
     get_target_property(_sources ${name} SOURCES)
     get_target_property(_includes ${name} INCLUDE_DIRECTORIES)

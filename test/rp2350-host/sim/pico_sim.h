@@ -7,7 +7,7 @@
  *  GPIO output levels, GPIO edge events with raw IRQ handlers, the global interrupt enable
  *  (save_and_disable_interrupts...).
  *
- *  For SBLIB_RP2350_PIO_BUS (order 052): PIO0 with behaviour models of the state machines of the
+ *  For SBLIB_RP2350_PIO_BUS: PIO0 with behaviour models of the state machines of the
  *  timer emulation (recognised by their program), and the DMA channels as far as the emulation uses
  *  them (32 bit single transfers, DREQ of a PIO RX FIFO or unpaced, chaining, IRQ 0). The RX state
  *  machine pushes one word per falling edge of its input pin. The TX state machine counts X down once per
@@ -27,11 +27,17 @@
  *  its source was active, also if the source is cleared before the handler runs (irq_clear()
  *  drops it), so a handler can run for an old event. Time only advances in
  *  sim::advance()/runUntil() and in busy waits (handlers take no time otherwise). An optional
- *  interrupt latency delays alarm interrupts; hardware events go on meanwhile (order 052).
+ *  interrupt latency delays alarm interrupts; hardware events go on meanwhile.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as
  *  published by the Free Software Foundation.
+ *
+ * @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
  */
 #ifndef SBLIB_TEST_RP2350_PICO_SIM_H_
 #define SBLIB_TEST_RP2350_PICO_SIM_H_

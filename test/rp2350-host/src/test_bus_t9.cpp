@@ -14,6 +14,8 @@
  *  (line numbers of sblib/src/eib/bus.cpp, inc/sblib/eib/bus_const.h at the time of writing).
  *  Observed deviations are tagged [!shouldfail] and described at the test case.
  *
+ *  @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as
  *  published by the Free Software Foundation.
@@ -583,10 +585,10 @@ TEST_CASE("bus collision: the peer wins in the control field, we receive, acknow
           "[rp2350][bus][collision]")
 {
     // Peer 0xB0 (system priority) vs. our 0xBC (low priority): bit 2 of the control field.
-    // S2 (orders 041/042): the former spike filter of the emulation compared timer values; the peer's
+    // The former spike filter of the emulation compared timer values; the peer's
     // 0 bit right after our 0 bit had the same timer value (69 us) and was dropped, bus.cpp detected the
     // collision one bit late and received 0xB4 instead of 0xB0. Fixed with the filter on system
-    // time, removed in order 050.
+    // time and later removed.
     const auto remote = remoteConnect(0xB0);
     for (const int offset: {-20, 0, 3})
     {
@@ -630,7 +632,7 @@ TEST_CASE("bus collision PIO: start bit synced to a foreign edge before ours end
 {
     // bus.cpp:1098-1103: a foreign edge up to STARTBIT_OFFSET_MIN before our start bit -> MAT0 now,
     // MAT2 = capture + 34. As on the LPC11xx (PWM output LOW with the reset by MR2) our pulse ends at
-    // capture + 35, also if it is then shorter than 35 us (order 062, finding 052 3.3: 1, 5.5, 9.2 us).
+    // capture + 35, also if it is then shorter than 35 us (1, 5.5, 9.2 us).
     const auto remote = remoteConnect(0xB0);
     for (const int offset: {-1, -5, -6, -9, -10, -20})
     {
@@ -932,10 +934,10 @@ TEST_CASE("bus jitter: bit edges far outside the window are rejected, the bus re
     }
 }
 
-TEST_CASE("bus jitter: bit edges 34..68 us late are accepted (R13, tolerated like Darth's bus.cpp)",
+TEST_CASE("bus jitter: bit edges 34..68 us late are accepted (tolerated like Darth's bus.cpp)",
           "[rp2350][bus][jitter]")
 {
-    // Accepted behaviour (R13, decision 25.10.2026, question to Darth open): the KNX window is
+    // Accepted behaviour (deliberately tolerated): the KNX window is
     // n*104 -7/+33 us (bus_const.h:37, 111), bus.cpp:848-852 only sets RX_TIMING_ERROR_SPIKE for an
     // edge later than BIT_OFFSET_MAX (33 us). rx_error is not part of `valid` (bus.cpp:783, 886), so
     // the telegram is taken and acknowledged; edges up to about +68 us still belong to their bit
@@ -1044,7 +1046,7 @@ TEST_CASE("bus spikes: inside a telegram", "[rp2350][bus][spike]")
 
 TEST_CASE("bus spikes: a spike shortly before a 0 bit must not hide the 0 bit", "[rp2350][bus][spike]")
 {
-    // S3 (orders 042/047/050): the former spike filter of the timer emulation dropped a falling edge
+    // The former spike filter of the timer emulation dropped a falling edge
     // less than 8 us after the last accepted one. bus.cpp has rejected the spike (bus high again,
     // bus.cpp:665-669), but the real 0 bit edge was filtered out: the bit read as 1, parity error, the
     // telegram was lost. Like the LPC11xx the emulation now captures both edges.
@@ -1398,7 +1400,7 @@ TEST_CASE("bus pause: pause() during repetitions waits until the telegram is fin
 
 TEST_CASE("bus pause: download with a flash write (pause) after some telegrams loses nothing", "[rp2350][bus][pause]")
 {
-    // R5: the application pauses the bus for the flash write when a telegram arrives. The peer repeats
+    // The application pauses the bus for the flash write when a telegram arrives. The peer repeats
     // the telegrams that came during the pause; with 3 repetitions this covers about 3 x 28 ms.
     for (const unsigned flashUs: {2000u, 20000u, 50000u})
     {
@@ -1428,7 +1430,7 @@ TEST_CASE("bus pause: download with a flash write (pause) after some telegrams l
 TEST_CASE("bus pause: a pause longer than the peer's 3 repetitions loses the telegram on layer 2",
           "[rp2350][bus][pause]")
 {
-    // Not a firmware deviation, the limit for R5: telegram, acknowledge slot and 50 bit times take
+    // Not a firmware deviation, the limit for pause(): telegram, acknowledge slot and 50 bit times take
     // about 28 ms here (15 byte MemoryWrite), 3 repetitions (NACK_RETRY_DEFAULT) cover about 85 ms.
     // A longer pause loses the telegram that arrives meanwhile (the transport layer of the sender
     // would have to repeat it).

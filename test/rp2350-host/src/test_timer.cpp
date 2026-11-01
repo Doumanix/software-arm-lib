@@ -13,6 +13,8 @@
  *    so the pulse lasts MR2 + 1 - MR0 ticks (bus.cpp: match(pwm, t), match(time, t + 35 - 1))
  *  Deliberate deviations of the emulation are named "deviation" in the test name.
  *
+ *  @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as
  *  published by the Free Software Foundation.
@@ -487,7 +489,7 @@ namespace
 
 } // namespace
 
-TEST_CASE("RP2350 timer: bus PWM pulse lasts MR2 + 1 - MR0 (35 us)", "[rp2350][timer][bus]") // R11
+TEST_CASE("RP2350 timer: bus PWM pulse lasts MR2 + 1 - MR0 (35 us)", "[rp2350][timer][bus]")
 {
     fresh();
     const auto t0 = startBusPulse(104);
@@ -546,7 +548,7 @@ TEST_CASE("RP2350 timer: bus PWM pulse keeps 35 us with alarm interrupt latency"
     }
 }
 
-TEST_CASE("RP2350 timer: bus PWM late interrupt keeps the pulse width", "[rp2350][timer][bus]") // R11
+TEST_CASE("RP2350 timer: bus PWM late interrupt keeps the pulse width", "[rp2350][timer][bus]")
 {
     // Pulse start and pulse end are due in the same (late) alarm interrupt
     fresh();
@@ -584,7 +586,7 @@ TEST_CASE("RP2350 timer: bus PWM sentinels 0xffff (MAT0) and 0xfffe (MAT2) are o
     CHECK(sim::alarmIrqCount() == 0);
 }
 
-TEST_CASE("RP2350 timer: bus PWM next bit re-arms MAT0", "[rp2350][timer][bus]") // R11
+TEST_CASE("RP2350 timer: bus PWM next bit re-arms MAT0", "[rp2350][timer][bus]")
 {
     // After the first pulse the handler programs the next bit, as bus.cpp does in SEND_BIT_0
     fresh();
@@ -613,7 +615,7 @@ TEST_CASE("RP2350 timer: bus PWM next bit re-arms MAT0", "[rp2350][timer][bus]")
 }
 
 // ---------------------------------------------------------------------------------------------
-// Bus PWM: TX edges and long interrupts (R16, order 051), diagnostics counters of the TX edges
+// Bus PWM: TX edges and long interrupts, diagnostics counters of the TX edges
 // ---------------------------------------------------------------------------------------------
 
 namespace
@@ -729,10 +731,10 @@ TEST_CASE("RP2350 timer: bus PWM edge counters - pulse end during a long RX edge
 #endif
 }
 
-TEST_CASE("RP2350 timer: bus PWM - a long RX edge interrupt does not delay the pulse end (R16)", "[rp2350][timer][bus]")
+TEST_CASE("RP2350 timer: bus PWM - a long RX edge interrupt does not delay the pulse end", "[rp2350][timer][bus]")
 {
     // LPC11xx: the PWM output is hardware, the pulse ends after 35 us whatever interrupt runs.
-    // R16 (order 051, fixed): the TX edge interrupt has a higher priority than the RX edge interrupt.
+    // The TX edge interrupt has a higher priority than the RX edge interrupt.
     for (const uint32_t handlerUs: {20u, 33u, 40u, 80u})
     {
         DYNAMIC_SECTION("handler " << handlerUs << " us")
@@ -918,7 +920,7 @@ TEST_CASE("RP2350 timer: capture without FALLING_EDGE ignores edges, old edges a
 
 TEST_CASE("RP2350 timer: edges closer than 8 us are captured (no spike filter)", "[rp2350][timer][capture]")
 {
-    // S3 (orders 047/050): as the LPC11xx the emulation captures every edge, bus.cpp checks short
+    // As the LPC11xx the emulation captures every edge, bus.cpp checks short
     // pulses itself. The diagnostics counters only count the short distances.
     fresh();
     timer16_1.begin();
@@ -946,9 +948,9 @@ TEST_CASE("RP2350 timer: edges closer than 8 us are captured (no spike filter)",
 
 TEST_CASE("RP2350 timer: an edge one RESET cycle later at a close timer value is captured", "[rp2350][timer][capture]")
 {
-    // S1 (orders 041/042): the former spike filter compared timer values. With a match RESET every bit
+    // The former spike filter compared timer values. With a match RESET every bit
     // time (bus.cpp while sending), an edge 104 us after the last accepted one has the same timer value
-    // and was dropped, one at +106 us (value +2) too. Since order 050 there is no filter at all.
+    // and was dropped, one at +106 us (value +2) too. There is no filter at all now.
     fresh();
     timer16_1.begin();
     timer16_1.captureMode(CAP0, FALLING_EDGE | INTERRUPT);
@@ -1095,10 +1097,10 @@ TEST_CASE("RP2350 timer: capture during a global interrupt lock is handled after
     interrupts();
     REQUIRE(calls.size() == 1);
 #if defined(SBLIB_RP2350_PIO_BUS)
-    // PIO and DMA: the time of the edge, as the LPC11xx capture hardware (R18)
+    // PIO and DMA: the time of the edge, as the LPC11xx capture hardware
     CHECK(timer16_1.capture(CAP0) == 100);
 #else
-    // Software capture: the value is the time of the handler, not of the edge (latency, R2)
+    // Software capture: the value is the time of the handler, not of the edge (latency)
     CHECK(timer16_1.capture(CAP0) == 120);
 #endif
 }
@@ -1146,7 +1148,7 @@ TEST_CASE("RP2350 timer: setIRQPriority() before begin() applies to alarm and GP
     CHECK(sim::irqPriority(IO_IRQ_BANK0) == 0x80);
 #else
     // Bus timer: the TX edge interrupt has the set priority, alarm and capture interrupt one hardware
-    // level less (order 051)
+    // level less
     constexpr uint RxIrq = IO_IRQ_BANK0;
     constexpr uint8_t BusIrqPriority = 0x10;
     CHECK(sim::irqPriority(hardware_alarm_get_irq_num(txEdge.alarmNum)) == 0x00);
@@ -1217,7 +1219,7 @@ TEST_CASE("RP2350 timer PIO: begin() stops with fatalError() if clk_sys has no i
 
 #if defined(SBLIB_RP2350_PIO_BUS)
 // ---------------------------------------------------------------------------------------------
-// KNX bus by PIO (SBLIB_RP2350_PIO_BUS, order 052, R18): RX edges by a state machine and DMA
+// KNX bus by PIO (SBLIB_RP2350_PIO_BUS): RX edges by a state machine and DMA
 // ---------------------------------------------------------------------------------------------
 
 TEST_CASE("RP2350 timer PIO: begin() claims the RX state machine and two DMA channels, end() releases them",
@@ -1248,7 +1250,7 @@ TEST_CASE("RP2350 timer PIO: the capture value is the timer value of the edge, a
           "[rp2350][timer][pio][capture]")
 {
     // The timer interrupt handler runs 30 us (match MAT1); an edge 5 us into it is captured with its own time.
-    // The software capture of the GPIO interrupt would read the time after the handler (R2, R18).
+    // The software capture of the GPIO interrupt would read the time after the handler.
     fresh();
     unsigned int captured = 0;
     uint64_t captureCallUs = 0;
@@ -1376,7 +1378,7 @@ TEST_CASE("RP2350 timer PIO: MAT0 re-armed during a running pulse does not start
     REQUIRE(txEdges(true).size() == 1);
     REQUIRE(txEdges(false).size() == 1);
     CHECK(txEdges(true)[0] == t0 + 104);
-    // As on the LPC11xx the pulse ends with the reset by MAT2, 35 us after the foreign edge (order 062)
+    // As on the LPC11xx the pulse ends with the reset by MAT2, 35 us after the foreign edge
     CHECK(txEdges(false)[0] == t0 + 103 + BitPulseTime);
 }
 #endif

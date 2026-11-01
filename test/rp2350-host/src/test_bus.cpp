@@ -9,6 +9,8 @@
  *  KNX TP1 character: start bit (0), 8 data bits LSB first, even parity, stop bit (1), then at
  *  least 2 bit times pause; a 0 bit is a 35 us pulse at the start of its 104 us bit time.
  *
+ *  @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as
  *  published by the Free Software Foundation.
@@ -207,7 +209,7 @@ namespace
 {
 
     // Duration of the timer interrupt handler of the bus before and after bus.cpp (busy wait), like
-    // bus.cpp running from the flash with cache misses (order 051: up to about 40 us on the test board)
+    // bus.cpp running from the flash with cache misses (up to about 40 us on the test board)
     uint32_t handlerBeforeUs = 0;
     uint32_t handlerAfterUs = 0;
     uint32_t captureHandlerAfterUs = 0; // additionally for capture events (own echo)
@@ -487,9 +489,9 @@ TEST_CASE("bus: late timer interrupts keep the frame and the pulse width", "[rp2
 TEST_CASE("bus: a slow timer interrupt handler (bus.cpp from flash) keeps the frame and the pulse width",
           "[rp2350][bus]")
 {
-    // R16 (order 051): the TX edge interrupt interrupts the handler, the match processing follows it.
+    // The TX edge interrupt interrupts the handler, the match processing follows it.
     // Up to 40 us per handler call in total (test board: at most 30 us in the alarm interrupt, 38 us in the
-    // RX edge interrupt). Before order 051 this failed from 40 us on; from 60 us on bus.cpp misses its
+    // RX edge interrupt). With the RX edge interrupt above the TX edge this failed from 40 us on; from 60 us on bus.cpp misses its
     // next match also with the TX edge interrupt (the handler runs into the next bit).
     const std::vector<uint8_t> longTelegram = {0xBC, 0x00, 0x00, 0x00, 0x01, 0x64, 0x62, 0x41, 0x01, 0x0E, 0xE0};
     for (const uint32_t before: {0u, 10u, 30u})

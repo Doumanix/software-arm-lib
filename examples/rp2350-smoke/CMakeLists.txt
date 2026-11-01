@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.28)
 # Minimal RP2350 build check: Pico SDK + toolchain + sblib configuration for SBLIB_MCU=RP2350.
 # Blinks the board LED and prints a line on UART1 (TX GPIO8, RX GPIO9, 115200 8N1).
 # Uses the sblib board header, digital pin, interrupt and time functions (library
-# sblib_rp2350); the KNX stack follows with the porting steps M4..M13.
+# sblib_rp2350); the KNX stack is built on top of it by the other targets.
 
 set(SBLIB_MCU "RP2350" CACHE STRING "Target microcontroller")
 include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/rp2350/pico_sdk_setup.cmake)

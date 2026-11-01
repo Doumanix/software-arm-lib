@@ -7,6 +7,8 @@
  *    SBLIB_PLATFORM_RP2350   Raspberry Pi RP2350 / RP2354 (Cortex-M33), compiler definition
  *                            PICO_RP2350=1, set by the Pico SDK for all targets linking pico_platform
  *
+ *  @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as
  *  published by the Free Software Foundation.

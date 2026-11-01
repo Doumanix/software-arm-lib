@@ -3,6 +3,7 @@
  *
  *  Created on: 20.11.2021
  *      Author: dridders
+ *      Author: Doumanix <doumanix@gmx.de>
  */
 
 #include <sblib/eib/addr_tablesBCU1.h>

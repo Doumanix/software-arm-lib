@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2014 Stefan Taferner <stefan.taferner@gmx.at>
  * Copyright (c) 2021 Horst Rauch
+ * Copyright (c) 2026 Doumanix <doumanix@gmx.de>
  * ********************************************************************
  *
  *  This program is free software; you can redistribute it and/or modify

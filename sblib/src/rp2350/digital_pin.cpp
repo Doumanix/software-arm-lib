@@ -9,9 +9,9 @@
  *    INPUT_ANALOG           digital input buffer disabled, no pulls (ADC input)
  *    PinModeFunc(PF_RXD...) UART, SPI, I2C function of the pin
  *    INPUT_CAPTURE,         SIO input / output. Capture and match of the LPC11xx timers are
- *    OUTPUT_MATCH           emulated by the Timer class (porting step M5). With SBLIB_RP2350_PIO_BUS
+ *    OUTPUT_MATCH           emulated by the Timer class. With SBLIB_RP2350_PIO_BUS
  *                           PIN_EIB_TX gets the function PIO0: a state machine of the timer emulation
- *                           switches it (order 052).
+ *                           switches it.
  *    OPEN_DRAIN             not supported (fatalError)
  *
  *  Pins that do not exist on the chip (e.g. GPIO_NC) are ignored.
@@ -20,6 +20,8 @@
  *  of a pin, pinEnableInterrupt()/pinDisableInterrupt() switch them. The interrupt handler
  *  is registered with the Pico SDK (gpio_add_raw_irq_handler) by the module using it and
  *  the interrupt is enabled with enableInterrupt(IO_IRQ_BANK0).
+ *
+ *  @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as

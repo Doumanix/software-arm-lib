@@ -26,7 +26,7 @@
  *    edge time and switches TX. It has a higher priority than the alarm (match processing) and
  *    capture interrupts of the bus timer, so a TX edge is exact also while they run the timer
  *    interrupt handler of the bus (bus.cpp, in flash). The match processing then follows in the
- *    alarm interrupt of the timer (order 051, R16).
+ *    alarm interrupt of the timer.
  *    Sentinels as used by the bus: MAT0 >= 0xffff and MAT2 >= 0xfffe are disabled.
  *  - Capture CAP0 of timer16_1: falling edge of PIN_EIB_RX via a raw GPIO interrupt handler.
  *    As with the LPC11xx the capture value is latched with FALLING_EDGE also without INTERRUPT;
@@ -35,7 +35,7 @@
  *    timerEmulationStats() counts edges closer than 8 us (system time) to the previous one.
  *  - A flag set while the timer interrupt is disabled calls the handler as soon as
  *    interrupts() enables it again, like a pending NVIC interrupt.
- *  - With the CMake option SBLIB_RP2350_PIO_BUS (default ON since order 062, R18): a PIO state machine
+ *  - With the CMake option SBLIB_RP2350_PIO_BUS (default ON): a PIO state machine
  *    detects the falling edges of PIN_EIB_RX and DMA copies the system time (TIMERAWL) of each edge.
  *    The capture value is the timer value at that time, as latched by the LPC11xx capture hardware,
  *    independent of the interrupt latency. The DMA interrupt then sets the capture flag and calls the
@@ -50,6 +50,12 @@
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as
  *  published by the Free Software Foundation.
+ *
+ * @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
  */
 #include "sblib/timer.h"
 #include "sblib/interrupt.h"

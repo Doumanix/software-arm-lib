@@ -4,6 +4,7 @@
  *
  * @author Stefan Taferner <stefan.taferner@gmx.at> Copyright (c) 2014
  * @author Darthyson <darth@maptrack.de> Copyright (c) 2021
+ * @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
  *
  * @bug No known bugs.
  ******************************************************************************/

@@ -10,6 +10,8 @@
  * UART1 (TX GPIO8, 115200 8N1) prints the start message and the physical address; with the
  * CMake option SBLIB_RP2350_TIMER_STATS (default ON here) also one diagnostics line per second.
  *
+ * @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
  * published by the Free Software Foundation.

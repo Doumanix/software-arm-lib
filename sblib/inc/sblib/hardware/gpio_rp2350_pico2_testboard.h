@@ -11,6 +11,8 @@
  *  Reserved by the Pico 2 itself: GPIO23 (SMPS mode), GPIO24 (USB VBUS sense),
  *  GPIO25 (LED), GPIO29 (VSYS/3 ADC).
  *
+ *  @author Doumanix <doumanix@gmx.de> Copyright (c) 2026
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as
  *  published by the Free Software Foundation.
