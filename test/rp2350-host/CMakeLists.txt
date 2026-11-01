@@ -96,3 +96,12 @@ foreach(module iap pin)
     endif()
     add_test(NAME rp2350_${module}_tests COMMAND rp2350_${module}_tests)
 endforeach()
+
+# The pin tests with the KNX bus by PIO (OUTPUT_MATCH of the bus TX pin selects the PIO function)
+add_executable(rp2350_pin_tests_pio src/main.cpp src/test_pin.cpp sim/pico_sim.cpp)
+target_include_directories(rp2350_pin_tests_pio PRIVATE sim ${SBLIB_PATH}/inc ${SBLIB_PATH}/src ${CATCH_PATH}/inc
+    ${PICO_SDK_PIO_INCLUDE})
+target_compile_definitions(rp2350_pin_tests_pio PRIVATE SBLIB_PLATFORM_DETECT_H_ SBLIB_PLATFORM_RP2350=1
+    SBLIB_BOARD_RP2350_PICO2_TESTBOARD SBLIB_RP2350_PIO_BUS)
+target_compile_options(rp2350_pin_tests_pio PRIVATE -Wall -Wextra -Wno-unused-parameter)
+add_test(NAME rp2350_pin_tests_pio COMMAND rp2350_pin_tests_pio)

@@ -35,7 +35,8 @@ IO functions. GPIO configuration records SDK function, direction, pulls, input b
 call counts. Tests cover peripheral functions, analog/bus keeper/unsupported modes, invalid
 pins, both 32-bit port masks and interrupt configuration/registration/dispatch. IRQ mode
 mapping is checked as SDK event masks; the simulation's existing edge model is not extended
-to a full pad/electrical or level-interrupt model. Both programs are built once; the modules do not depend on the bus variant.
+to a full pad/electrical or level-interrupt model. The program is also built with `SBLIB_RP2350_PIO_BUS` (`rp2350_pin_tests_pio`), because
+the function of the bus TX pin depends on the bus variant.
 
 
 `src/test_timer.cpp` (`rp2350_host_tests`): emulation of the LPC11xx timers
