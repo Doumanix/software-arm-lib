@@ -39,8 +39,14 @@ void IAP_Call (uintptr_t * cmd, uintptr_t * stat);
 // Size for smaller LPC1114 simulated flash: 32k (8 * 4k)
 // #define FLASH_SIZE  0x8000
 
-// Size for the simulated flash: 64k (16 * 4k), value for LPC1115
+// Size for the simulated flash: 64k (16 * 4k), value for LPC1115.
+// The MemMapper tests with wide allocation-table entries (MEMMAPPER_LARGE_INDICES) need physical
+// page numbers above 255 and use the largest flash that iapFlashSize() can report: 512k (128 * 4k).
+#ifdef MEMMAPPER_LARGE_INDICES
+#define FLASH_SIZE  0x80000
+#else
 #define FLASH_SIZE  0x10000
+#endif
 
 
 #ifdef __cplusplus

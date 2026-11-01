@@ -10,6 +10,8 @@
 #include <iap_emu.h>
 #include <cstring>
 #include <iomanip>
+#include <new>
+#include <vector>
 #include <sys/param.h>
 #include <catch.hpp>
 
@@ -24,6 +26,140 @@ constexpr uint32_t TEST_FLASH_SIZE = 0x1000;
 void resetFlash()
 {
     IAP_Init_Flash(0xff);
+}
+
+/**
+ * @brief Decodes one allocation-table entry of the region at @p flashBase directly from the flash.
+ *
+ * @param flashBase Offset of the managed region, as passed to the MemMapper constructor.
+ * @param virtPage  Virtual page number, i.e. the index of the entry in the allocation table.
+ * @return Physical page number the entry points to, 0 when the virtual page is unallocated.
+ */
+static uint32_t physicalPageOf(uint32_t flashBase, uint32_t virtPage)
+{
+    MemMapper::AllocEntryType raw = 0;
+    memcpy(&raw, &FLASH[flashBase + (virtPage * sizeof(MemMapper::AllocEntryType))], sizeof(raw));
+    return static_cast<uint32_t>(raw ^ MemMapper::AllocEntryXorMask);
+}
+
+/**
+ * @brief Writes one encoded allocation-table entry of the region at @p flashBase.
+ *
+ * @param flashBase Offset of the managed region, as passed to the MemMapper constructor.
+ * @param virtPage  Virtual page number, i.e. the index of the entry in the allocation table.
+ * @param raw       Encoded entry, as it is stored in flash.
+ */
+static void writeRawAllocTableEntry(uint32_t flashBase, uint32_t virtPage, MemMapper::AllocEntryType raw)
+{
+    memcpy(&FLASH[flashBase + (virtPage * sizeof(MemMapper::AllocEntryType))], &raw, sizeof(raw));
+}
+
+/**
+ * @brief Copies the whole simulated flash, to compare it with the state after a test.
+ */
+static std::vector<uint8_t> snapshotFlash()
+{
+    return std::vector<uint8_t>(FLASH, FLASH + FLASH_SIZE);
+}
+
+/**
+ * @brief Requires that every allocated virtual page of the region points into its own data area.
+ *
+ * The first page of the region holds the allocation table, so a valid data page number lies in
+ * [base page + 1, last page of the region]. An allocation-table entry that was truncated on its
+ * way to flash points somewhere else, which is what this check catches.
+ *
+ * @param flashBase Offset of the managed region.
+ * @param flashSize Size of the managed region in bytes.
+ */
+static void requireAllocatedPagesInsideRegion(uint32_t flashBase, uint32_t flashSize)
+{
+    const uint32_t basePage = flashBase / FLASH_PAGE_SIZE;
+    const uint32_t lastPage = basePage + (flashSize / FLASH_PAGE_SIZE) - 1;
+    for (uint32_t virtPage = 0; virtPage < MemMapper::allocTableSize; virtPage++)
+    {
+        const uint32_t physicalPage = physicalPageOf(flashBase, virtPage);
+        if (physicalPage == 0)
+        {
+            continue; // unallocated
+        }
+        INFO("virtual page 0x" << std::hex << virtPage << " points to physical page 0x" << physicalPage
+                << ", region is 0x" << basePage << "..0x" << lastPage);
+        REQUIRE(physicalPage > basePage);
+        REQUIRE(physicalPage <= lastPage);
+    }
+}
+
+/**
+ * @brief Requires that no byte outside [@p flashBase, @p flashBase + @p flashSize) changed.
+ *
+ * A readback alone does not prove the write location: a MemMapper that stores a truncated page
+ * number reads the data back from the same wrong place it wrote it to. Comparing every byte
+ * outside the managed region with @p before shows where the data page really went.
+ *
+ * @param before    Copy of the simulated flash taken before the test, see @ref snapshotFlash.
+ * @param flashBase Offset of the managed region.
+ * @param flashSize Size of the managed region in bytes.
+ */
+static void requireFlashUnchangedOutside(const std::vector<uint8_t>& before, uint32_t flashBase, uint32_t flashSize)
+{
+    REQUIRE(before.size() == static_cast<size_t>(FLASH_SIZE));
+    uint32_t changed = FLASH_SIZE;
+    for (uint32_t i = 0; i < FLASH_SIZE; i++)
+    {
+        if ((i >= flashBase) && (i < (flashBase + flashSize)))
+        {
+            continue;
+        }
+        if (before[i] != FLASH[i])
+        {
+            changed = i;
+            break;
+        }
+    }
+    INFO("first byte changed outside the managed region: 0x" << std::hex << changed);
+    REQUIRE(changed == FLASH_SIZE);
+}
+
+/**
+ * @brief Requires that the whole simulated flash is still byte identical to @p before.
+ *
+ * A rejected call must not have written anything, neither into the managed region nor into the
+ * allocation table. Unlike @ref requireFlashUnchangedOutside this compares every byte, because
+ * the effect of a missing bounds check lies inside the region.
+ *
+ * @param before Copy of the simulated flash taken before the call, see @ref snapshotFlash.
+ */
+static void requireFlashUnchanged(const std::vector<uint8_t>& before)
+{
+    REQUIRE(before.size() == static_cast<size_t>(FLASH_SIZE));
+    uint32_t changed = FLASH_SIZE;
+    for (uint32_t i = 0; i < FLASH_SIZE; i++)
+    {
+        if (before[i] != FLASH[i])
+        {
+            changed = i;
+            break;
+        }
+    }
+    INFO("first changed flash byte: 0x" << std::hex << changed);
+    REQUIRE(changed == FLASH_SIZE);
+}
+
+/**
+ * @brief Requires that the virtual pages up to @p lastVirtPage of the region are unallocated.
+ *
+ * @param flashBase     Offset of the managed region, as passed to the MemMapper constructor.
+ * @param firstVirtPage First virtual page number to check.
+ * @param lastVirtPage  Last virtual page number to check (inclusive).
+ */
+static void requirePagesUnallocated(uint32_t flashBase, uint32_t firstVirtPage, uint32_t lastVirtPage)
+{
+    for (uint32_t virtPage = firstVirtPage; virtPage <= lastVirtPage; virtPage++)
+    {
+        INFO("virtual page 0x" << std::hex << virtPage);
+        REQUIRE(physicalPageOf(flashBase, virtPage) == 0);
+    }
 }
 
 TEST_CASE("MemMapper::", "[MemMapper]")
@@ -48,23 +184,24 @@ TEST_CASE("MemMapper::", "[MemMapper]")
             REQUIRE(mm.isMapped(0xffff) == false);
         }
 
-        SECTION("single zero byte in allocTable is not treated as corrupt")
+        SECTION("single zero entry in allocTable is not treated as corrupt")
         {
             resetFlash();
             constexpr uint32_t MAPPED_PAGE = 5;
-            // allocTable[MAPPED_PAGE] = FLASH[TEST_FLASH_BASE + MAPPED_PAGE] = 0x00 means virtual page maps to physical page 0xff (255)
-            FLASH[TEST_FLASH_BASE + MAPPED_PAGE] = 0x00;
+            // A raw entry of 0 decodes to AllocEntryXorMask, so the virtual page reads as mapped
+            // (with one byte entries on the LPC11xx: physical page 0xff (255))
+            writeRawAllocTableEntry(TEST_FLASH_BASE, MAPPED_PAGE, 0);
             MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
             REQUIRE(mm.isMapped(MAPPED_PAGE * FLASH_PAGE_SIZE) == true);
         }
 
-        SECTION("two zero bytes in allocTable triggers corruption reset")
+        SECTION("two zero entries in allocTable triggers corruption reset")
         {
             resetFlash();
             constexpr uint32_t FIRST_ZERO_MAPPED = 0;
             constexpr uint32_t SECOND_ZERO_MAPPED = 1;
-            FLASH[TEST_FLASH_BASE + FIRST_ZERO_MAPPED] = 0x00;
-            FLASH[TEST_FLASH_BASE + SECOND_ZERO_MAPPED] = 0x00;
+            writeRawAllocTableEntry(TEST_FLASH_BASE, FIRST_ZERO_MAPPED, 0);
+            writeRawAllocTableEntry(TEST_FLASH_BASE, SECOND_ZERO_MAPPED, 0);
             MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
             REQUIRE(mm.isMapped(FIRST_ZERO_MAPPED * FLASH_PAGE_SIZE) == false);
             REQUIRE(mm.isMapped(SECOND_ZERO_MAPPED * FLASH_PAGE_SIZE) == false);
@@ -527,4 +664,332 @@ TEST_CASE("allocating a 16th data page returns OUT_OF_MEMORY")
     MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
     REQUIRE(mm.addRange(0, 15 * FLASH_PAGE_SIZE) == MemMapper::Error::Success);
     REQUIRE(mm.addRange(15 * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE) == MemMapper::Error::OutOfMemory);
+}
+
+#if defined(MEMMAPPER_LARGE_INDICES)
+/**
+ * Region for the tests with wide allocation-table entries: the last 8 KiB of the simulated flash.
+ * Its base page lies above 255, so an entry truncated to 8 bit points outside the region.
+ */
+constexpr uint32_t HIGH_FLASH_SIZE = 0x2000;
+constexpr uint32_t HIGH_FLASH_BASE = FLASH_SIZE - HIGH_FLASH_SIZE;
+#endif
+
+TEST_CASE("MemMapper writes its data pages inside the managed region", "[MemMapper][location]")
+{
+    SECTION("region at the usual test base")
+    {
+        resetFlash();
+        const std::vector<uint8_t> before = snapshotFlash();
+        MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
+        REQUIRE(mm.addRange(0x0000, 4 * FLASH_PAGE_SIZE) == MemMapper::Error::Success);
+        REQUIRE(mm.writeMem(0x0042, 0xAB) == MemMapper::Error::Success);
+        REQUIRE(mm.doFlash() == MemMapper::FlashedWriteBuffer);
+        requireAllocatedPagesInsideRegion(TEST_FLASH_BASE, TEST_FLASH_SIZE);
+        requireFlashUnchangedOutside(before, TEST_FLASH_BASE, TEST_FLASH_SIZE);
+    }
+
+#if defined(MEMMAPPER_LARGE_INDICES)
+    SECTION("region above physical page 255")
+    {
+        resetFlash();
+        const std::vector<uint8_t> before = snapshotFlash();
+        MemMapper mm(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, false);
+        REQUIRE(mm.addRange(0x0000, 4 * FLASH_PAGE_SIZE) == MemMapper::Error::Success);
+        REQUIRE(mm.writeMem(0x0042, 0xAB) == MemMapper::Error::Success);
+        REQUIRE(mm.doFlash() == MemMapper::FlashedWriteBuffer);
+        requireAllocatedPagesInsideRegion(HIGH_FLASH_BASE, HIGH_FLASH_SIZE);
+        requireFlashUnchangedOutside(before, HIGH_FLASH_BASE, HIGH_FLASH_SIZE);
+    }
+#endif
+}
+
+#if defined(MEMMAPPER_LARGE_INDICES)
+TEST_CASE("MemMapper in a region above physical page 255", "[MemMapper][location]")
+{
+    SECTION("clean flash: no virtual page is mapped")
+    {
+        resetFlash();
+        MemMapper mm(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, false);
+        REQUIRE(mm.isMapped(0x0000) == false);
+        REQUIRE(mm.isMapped(HIGH_FLASH_SIZE - FLASH_PAGE_SIZE) == false);
+    }
+
+    SECTION("data written before a restart is read back from the allocated page")
+    {
+        resetFlash();
+        {
+            MemMapper mm(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, false);
+            REQUIRE(mm.addRange(0x0000, FLASH_PAGE_SIZE) == MemMapper::Error::Success);
+            REQUIRE(mm.writeMem(0x0042, 0xAB) == MemMapper::Error::Success);
+            REQUIRE(mm.doFlash() == MemMapper::FlashedWriteBuffer);
+        }
+
+        // The table must name the first data page of the region, not a truncated page number
+        const uint32_t physicalPage = physicalPageOf(HIGH_FLASH_BASE, 0);
+        REQUIRE(physicalPage == ((HIGH_FLASH_BASE / FLASH_PAGE_SIZE) + 1));
+        REQUIRE(FLASH[(physicalPage * FLASH_PAGE_SIZE) + 0x42] == 0xAB);
+
+        MemMapper restarted(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, false);
+        REQUIRE(restarted.isMapped(0x0000) == true);
+        uint8_t data = 0;
+        REQUIRE(restarted.readMem(0x0042, data) == MemMapper::Error::Success);
+        REQUIRE(data == 0xAB);
+    }
+
+    SECTION("a flushed data page leaves the flash outside the region unchanged")
+    {
+        resetFlash();
+        const std::vector<uint8_t> before = snapshotFlash();
+        MemMapper mm(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, false);
+        REQUIRE(mm.addRange(0x0000, FLASH_PAGE_SIZE) == MemMapper::Error::Success);
+        REQUIRE(mm.writeMem(0x0042, 0xAB) == MemMapper::Error::Success);
+        REQUIRE(mm.doFlash() == MemMapper::FlashedWriteBuffer);
+        requireFlashUnchangedOutside(before, HIGH_FLASH_BASE, HIGH_FLASH_SIZE);
+    }
+
+    SECTION("automatically allocated pages stay inside the region")
+    {
+        resetFlash();
+        const std::vector<uint8_t> before = snapshotFlash();
+        MemMapper mm(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, true);
+        REQUIRE(mm.writeMem(0x0042, 0xEF) == MemMapper::Error::Success);
+        REQUIRE(mm.writeMem(0x0142, 0xCD) == MemMapper::Error::Success);
+        REQUIRE(mm.doFlash() == MemMapper::FlashedWriteBuffer);
+        uint8_t data = 0;
+        REQUIRE(mm.readMem(0x0042, data, true) == MemMapper::Error::Success);
+        REQUIRE(data == 0xEF);
+        REQUIRE(mm.readMem(0x0142, data, true) == MemMapper::Error::Success);
+        REQUIRE(data == 0xCD);
+        requireAllocatedPagesInsideRegion(HIGH_FLASH_BASE, HIGH_FLASH_SIZE);
+        requireFlashUnchangedOutside(before, HIGH_FLASH_BASE, HIGH_FLASH_SIZE);
+    }
+
+    SECTION("all data pages of the region fit, the next one is out of memory")
+    {
+        resetFlash();
+        MemMapper mm(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, false);
+        constexpr uint32_t dataPages = (HIGH_FLASH_SIZE / FLASH_PAGE_SIZE) - 1; // page 0 is the table
+        REQUIRE(mm.addRange(0, dataPages * FLASH_PAGE_SIZE) == MemMapper::Error::Success);
+        for (uint32_t page = 0; page < dataPages; page++)
+        {
+            REQUIRE(mm.isMapped(page * FLASH_PAGE_SIZE) == true);
+        }
+        requireAllocatedPagesInsideRegion(HIGH_FLASH_BASE, HIGH_FLASH_SIZE);
+        REQUIRE(mm.addRange(dataPages * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE) == MemMapper::Error::OutOfMemory);
+    }
+
+    SECTION("the last entry of the allocation table is the last usable virtual page")
+    {
+        resetFlash();
+        MemMapper mm(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, false);
+        constexpr uint32_t lastVirtPage = MemMapper::allocTableSize - 1;
+        REQUIRE(mm.addRange(lastVirtPage * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE) == MemMapper::Error::Success);
+        REQUIRE(mm.isMapped(lastVirtPage * FLASH_PAGE_SIZE) == true);
+        REQUIRE(mm.addRange(MemMapper::allocTableSize * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+    }
+}
+#endif
+
+TEST_CASE("MemMapper rejects a range behind the end of the allocation table", "[MemMapper][bounds]")
+{
+    // The test region holds one allocation-table page and dataPages data pages, so a range of
+    // dataPages virtual pages needs exactly the whole region: a range that is one page longer can
+    // only be rejected by the bounds check, not by a missing flash page.
+    constexpr uint32_t dataPages = (TEST_FLASH_SIZE / FLASH_PAGE_SIZE) - 1;
+    constexpr uint32_t lastVirtPage = MemMapper::allocTableSize - 1;
+    constexpr uint32_t firstVirtPage = MemMapper::allocTableSize - dataPages;
+
+    SECTION("a range that ends at the last table entry is accepted")
+    {
+        resetFlash();
+        const std::vector<uint8_t> before = snapshotFlash();
+        MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
+        REQUIRE(mm.addRange(firstVirtPage * FLASH_PAGE_SIZE, dataPages * FLASH_PAGE_SIZE) ==
+                MemMapper::Error::Success);
+        for (uint32_t virtPage = firstVirtPage; virtPage <= lastVirtPage; virtPage++)
+        {
+            INFO("virtual page 0x" << std::hex << virtPage);
+            REQUIRE(mm.isMapped(virtPage * FLASH_PAGE_SIZE) == true);
+        }
+        requireAllocatedPagesInsideRegion(TEST_FLASH_BASE, TEST_FLASH_SIZE);
+        requireFlashUnchangedOutside(before, TEST_FLASH_BASE, TEST_FLASH_SIZE);
+    }
+
+    SECTION("a range that is one page longer than the table end is rejected")
+    {
+        resetFlash();
+        MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
+        const std::vector<uint8_t> before = snapshotFlash();
+        REQUIRE(mm.addRange(firstVirtPage * FLASH_PAGE_SIZE, (dataPages + 1) * FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+        requireFlashUnchanged(before);
+        requirePagesUnallocated(TEST_FLASH_BASE, 0, lastVirtPage);
+    }
+
+    SECTION("ranges that reach past the table end are rejected before anything is allocated")
+    {
+        resetFlash();
+        MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
+        const std::vector<uint8_t> before = snapshotFlash();
+        // Pages before the end of the table and pages of the range; every pair is too long. With
+        // 128 table entries (RP2350) the pair 8/20 is the range 120/20 of the finding.
+        constexpr uint32_t ranges[][2] = {{16, 20}, {8, 20}, {4, 8}, {2, 3}, {1, 2}};
+        for (const auto& range : ranges)
+        {
+            const uint32_t virtPage = MemMapper::allocTableSize - range[0];
+            INFO("start page 0x" << std::hex << virtPage << ", pages 0x" << range[1]);
+            REQUIRE(mm.addRange(virtPage * FLASH_PAGE_SIZE, range[1] * FLASH_PAGE_SIZE) ==
+                    MemMapper::Error::InvalidAddress);
+        }
+        requireFlashUnchanged(before);
+        requirePagesUnallocated(TEST_FLASH_BASE, 0, lastVirtPage);
+    }
+
+    SECTION("a start page behind the table is rejected")
+    {
+        resetFlash();
+        MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
+        const std::vector<uint8_t> before = snapshotFlash();
+        REQUIRE(mm.addRange(MemMapper::allocTableSize * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+        REQUIRE(mm.addRange(MemMapper::allocTableSize * FLASH_PAGE_SIZE, dataPages * FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+        REQUIRE(mm.addRange(0x10000, FLASH_PAGE_SIZE) == MemMapper::Error::InvalidAddress);
+        requireFlashUnchanged(before);
+        requirePagesUnallocated(TEST_FLASH_BASE, 0, lastVirtPage);
+    }
+
+    SECTION("very large page aligned lengths are rejected")
+    {
+        resetFlash();
+        MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
+        const std::vector<uint8_t> before = snapshotFlash();
+        // Every length is a multiple of the page size, so only the end of the range can reject
+        // it. The page count of the last one is 0xffffff, the largest that length can express.
+        constexpr uint32_t lengths[] = {0x1000000, 0xffff00, 0x80000000, 0xffffff00};
+        for (const uint32_t length : lengths)
+        {
+            INFO("length 0x" << std::hex << length);
+            REQUIRE(mm.addRange(0, length) == MemMapper::Error::InvalidAddress);
+            REQUIRE(mm.addRange(lastVirtPage * FLASH_PAGE_SIZE, length) == MemMapper::Error::InvalidAddress);
+        }
+        REQUIRE(mm.addRange(lastVirtPage * FLASH_PAGE_SIZE, 2 * FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+        requireFlashUnchanged(before);
+        requirePagesUnallocated(TEST_FLASH_BASE, 0, lastVirtPage);
+    }
+
+    SECTION("alignment and zero length keep their error code")
+    {
+        resetFlash();
+        MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
+        const std::vector<uint8_t> before = snapshotFlash();
+        REQUIRE(mm.addRange(0, 0) == MemMapper::Error::InvalidLength);
+        REQUIRE(mm.addRange(0, FLASH_PAGE_SIZE - 1) == MemMapper::Error::InvalidLength);
+        REQUIRE(mm.addRange(0, FLASH_PAGE_SIZE + 1) == MemMapper::Error::InvalidLength);
+        REQUIRE(mm.addRange(0x0042, FLASH_PAGE_SIZE) == MemMapper::Error::InvalidAddress);
+        // The length is judged first, also at the end of the table where the range is too long
+        REQUIRE(mm.addRange(lastVirtPage * FLASH_PAGE_SIZE, 0) == MemMapper::Error::InvalidLength);
+        REQUIRE(mm.addRange(lastVirtPage * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE + 1) ==
+                MemMapper::Error::InvalidLength);
+        REQUIRE(mm.addRange((lastVirtPage * FLASH_PAGE_SIZE) + 1, FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+        REQUIRE(mm.addRange(0x0042, 0xffff01) == MemMapper::Error::InvalidLength);
+        requireFlashUnchanged(before);
+        requirePagesUnallocated(TEST_FLASH_BASE, 0, lastVirtPage);
+    }
+
+    SECTION("a rejected range leaves the mapped pages and the object state untouched")
+    {
+        resetFlash();
+        MemMapper mm(TEST_FLASH_BASE, TEST_FLASH_SIZE, false);
+        REQUIRE(mm.addRange(0, 2 * FLASH_PAGE_SIZE) == MemMapper::Error::Success);
+        REQUIRE(mm.writeMem(0x0042, 0xAB) == MemMapper::Error::Success);
+        mm.setEndianess(BIG_ENDIAN);
+        REQUIRE(mm.setUInt16(0x0110, 0x1234) == MemMapper::Error::Success);
+        const uint32_t secondDataPage = physicalPageOf(TEST_FLASH_BASE, 1);
+        const std::vector<uint8_t> before = snapshotFlash();
+
+        REQUIRE(mm.addRange(lastVirtPage * FLASH_PAGE_SIZE, 2 * FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+        requireFlashUnchanged(before);
+
+        // writePage and flashMemModified survived: the staged data page is still committed
+        REQUIRE(mm.doFlash() == MemMapper::FlashedWriteBuffer);
+        uint8_t data = 0;
+        REQUIRE(mm.readMem(0x0042, data) == MemMapper::Error::Success);
+        REQUIRE(data == 0xAB);
+        // endianess survived: the byte order of the multi byte accessors is unchanged
+        REQUIRE(mm.getUInt16(0x0110) == 0x1234);
+        REQUIRE(mm.getUInt8(0x0110) == 0x12);
+        // lastAllocated survived: the next data page of the region is allocated
+        REQUIRE(mm.addRange(2 * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE) == MemMapper::Error::Success);
+        REQUIRE(physicalPageOf(TEST_FLASH_BASE, 2) == (secondDataPage + 1));
+        REQUIRE(mm.isMapped(0x0000) == true);
+        REQUIRE(mm.isMapped(0x0100) == true);
+        REQUIRE(mm.isMapped(0x0200) == true);
+        requireAllocatedPagesInsideRegion(TEST_FLASH_BASE, TEST_FLASH_SIZE);
+    }
+
+#if defined(MEMMAPPER_LARGE_INDICES)
+    SECTION("the range of 20 pages from virtual page 120 is rejected")
+    {
+        resetFlash();
+        MemMapper mm(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, false);
+        const std::vector<uint8_t> before = snapshotFlash();
+        // Virtual page 120 lies inside the 128 entry table, 20 pages reach 12 pages behind its end
+        REQUIRE(mm.addRange(120 * FLASH_PAGE_SIZE, 20 * FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+        requireFlashUnchanged(before);
+        requirePagesUnallocated(HIGH_FLASH_BASE, 0, MemMapper::allocTableSize - 1);
+
+        // The eight pages up to the last entry are accepted, the page behind it is not
+        REQUIRE(mm.addRange(120 * FLASH_PAGE_SIZE, 8 * FLASH_PAGE_SIZE) == MemMapper::Error::Success);
+        for (uint32_t virtPage = 120; virtPage < MemMapper::allocTableSize; virtPage++)
+        {
+            REQUIRE(mm.isMapped(virtPage * FLASH_PAGE_SIZE) == true);
+        }
+        requireAllocatedPagesInsideRegion(HIGH_FLASH_BASE, HIGH_FLASH_SIZE);
+        REQUIRE(mm.addRange(MemMapper::allocTableSize * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+    }
+
+    SECTION("a rejected range does not write past the object")
+    {
+        resetFlash();
+        // Guard bytes around the object: an index behind the end of the table addresses
+        // ramBuffer[index * AllocEntryBytes], which on the RP2350 leaves the 256 byte buffer,
+        // overwrites the members behind it and finally the memory behind the object.
+        // A local class must not have static data members, so the guard size is a local constant.
+        constexpr uint32_t guardSize = 512;
+        struct GuardedMapper
+        {
+            uint8_t before[guardSize];
+            alignas(MemMapper) uint8_t object[sizeof(MemMapper)];
+            uint8_t after[guardSize];
+        };
+        GuardedMapper guarded{};
+        memset(guarded.before, 0xa5, guardSize);
+        memset(guarded.after, 0xa5, guardSize);
+        MemMapper* mm = new (guarded.object) MemMapper(HIGH_FLASH_BASE, HIGH_FLASH_SIZE, false);
+
+        REQUIRE(mm->addRange(127 * FLASH_PAGE_SIZE, 32 * FLASH_PAGE_SIZE) ==
+                MemMapper::Error::InvalidAddress);
+
+        uint32_t changed = guardSize;
+        for (uint32_t i = 0; i < guardSize; i++)
+        {
+            if ((guarded.before[i] != 0xa5) || (guarded.after[i] != 0xa5))
+            {
+                changed = i;
+                break;
+            }
+        }
+        INFO("first changed guard byte: 0x" << std::hex << changed);
+        REQUIRE(changed == guardSize);
+        mm->~MemMapper();
+    }
+#endif
 }

@@ -21,8 +21,8 @@
  * @details
  * MemMapper provides a virtual memory abstraction over a region of on-chip flash memory.
  * The virtual address space is partitioned into 256 byte pages.
- * Entries are stored XOR-inverted (raw = value ^ 0xff) so that an erased flash
- * byte (0xff) is interpreted as "unallocated" (logical value 0).
+ * Entries are stored XOR-inverted (raw = value ^ @ref AllocEntryXorMask) so that an erased
+ * flash entry is interpreted as "unallocated" (logical value 0).
  * Write operations are buffered in a RAM write buffer (@ref ramBuffer) and only
  * committed to flash on demand via @ref doFlash(). The allocation table is accessed
  * directly in flash for reads. Writes stage the full table page into @ref ramBuffer
@@ -65,6 +65,37 @@ public:
      *          table</em> which is internally used to map virtual page indices to physical flash page numbers.
      */
     explicit MemMapper(uint32_t flashBase, uint32_t flashSize, bool autoAddPage = false);
+
+    /**
+     * @brief Type of one allocation-table entry and the mask that encodes it in flash.
+     *
+     * The managed region of an RP2350 lies at the end of a flash with more than 256 pages, so a
+     * physical page number does not fit into one byte there. The LPC11xx keeps the one byte
+     * format and therefore its on-flash layout. @c MEMMAPPER_LARGE_INDICES selects the wide
+     * format in host tests, which always run on the LPC11xx emulation.
+     * @note One entry addresses the physical pages 0 to @c AllocEntryXorMask.
+     * @note @ref ramBuffer and the managed region are page aligned, so the entries of an
+     *       allocation table are aligned for this type.
+     */
+#if defined(MEMMAPPER_LARGE_INDICES)
+    using AllocEntryType = uint16_t;
+    static constexpr AllocEntryType AllocEntryXorMask = 0xffffu; ///< XOR mask of one entry in flash.
+#else
+    using AllocEntryType = uint8_t;
+    static constexpr AllocEntryType AllocEntryXorMask = 0xffu;   ///< XOR mask of one entry in flash.
+#endif
+
+    /** @brief Size of one allocation-table entry in bytes. */
+    static constexpr int32_t AllocEntryBytes = sizeof(AllocEntryType);
+
+    /**
+     * @brief Number of entries in the allocation table (one per virtual page).
+     *
+     * The table always occupies exactly one flash page: 256 entries of one byte on the LPC11xx,
+     * 128 entries of two bytes on the RP2350.
+     * @note The number of entries limits the virtual address space to @c allocTableSize pages.
+     */
+    static constexpr uint32_t allocTableSize = FLASH_PAGE_SIZE / sizeof(AllocEntryType);
 
     /** Default constructor is not allowed. */
     MemMapper() = delete;
@@ -156,6 +187,11 @@ public:
      * @p virtAddress + @p length) that is not yet mapped, a new physical flash
      * page is allocated and the allocation table is immediately committed to
      * flash. Already-mapped pages are skipped.
+     *
+     * The whole range must lie inside the @c allocTableSize virtual pages that the allocation
+     * table can name. Nothing is read, written or allocated before that is verified: a range
+     * that ends behind the table is rejected with @ref Error::InvalidAddress, exactly like a
+     * start page behind the table.
      *
      * @param virtAddress Page-aligned 16-bit virtual start address.
      *                    Must be a multiple of @c FLASH_PAGE_SIZE.
@@ -351,9 +387,6 @@ private:
 
     static constexpr uint8_t InvalidAllocTableByte = 0xff; ///< Raw flash byte representing an unallocated entry.
 
-    /** @brief Number of entries in the allocation table (one per virtual page). */
-    static constexpr uint32_t allocTableSize = FLASH_PAGE_SIZE;
-
     /** @brief RAM write buffer for the currently active flash page. */
     alignas(FLASH_RAM_BUFFER_ALIGNMENT) mutable uint8_t ramBuffer[FLASH_PAGE_SIZE];
 
@@ -405,9 +438,9 @@ private:
     /**
      * @brief Verifies the allocation table in flash and resets it if corrupted.
      *
-     * Reads directly from flash. Scans for raw zero bytes (which would represent
-     * physical page 0xff, an unlikely valid value). Finding more than one such
-     * byte is treated as table corruption (e.g. from a partial flash erase),
+     * Reads directly from flash. Scans for raw zero entries (which would represent
+     * the physical page @c AllocEntryXorMask, an unlikely valid value). Finding more than
+     * one such entry is treated as table corruption (e.g. from a partial flash erase),
      * and @ref clearAllocTable() is called to recover.
      *
      * @note A more thorough check should verify that no physical page number appears more than once in the table.
@@ -418,25 +451,25 @@ private:
      * @brief Writes a single entry to the allocation table.
      *
      * Copies the allocation table from flash into @ref ramBuffer (if not already
-     * loaded), modifies the entry XOR-inverted (value ^ 0xff) to match the raw
-     * flash representation where 0xff means "unallocated", and sets
+     * loaded), modifies the entry XOR-inverted (@ref AllocEntryXorMask) to match the raw
+     * flash representation where an erased entry means "unallocated", and sets
      * @ref allocTableModified if the value actually changes.
      *
      * @param index Entry index equal to the virtual page number.
      * @param value Physical flash page number to store.
      */
-    void writeAllocTableEntry(uint8_t index, uint8_t value) const;
+    void writeAllocTableEntry(uint8_t index, AllocEntryType value) const;
 
     /**
      * @brief Reads a single entry from the allocation table directly in flash.
      *
-     * Returns the XOR-inverted raw flash byte, yielding 0 for an unallocated
+     * Returns the XOR-inverted raw flash entry, yielding 0 for an unallocated
      * entry and the physical page number for an allocated one.
      *
      * @param index Entry index equal to the virtual page number.
      * @return Physical flash page number, or @c 0 if the entry is unallocated.
      */
-    uint8_t readAllocTableEntry(uint8_t index) const;
+    AllocEntryType readAllocTableEntry(uint8_t index) const;
 
     /**
      * @brief Returns the byte offset within a page from a virtual address.

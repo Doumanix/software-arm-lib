@@ -29,6 +29,18 @@
             }
         },
         {
+            "name": "x64_rp",
+            "displayName": "x64 RP MemMapper Target",
+            "description": "x64 with wide MemMapper allocation-table entries and a larger simulated flash",
+            "hidden": false,
+            "inherits": [
+                "x64"
+            ],
+            "cacheVariables": {
+                "SBLIB_MEMMAPPER_LARGE_INDICES": "ON"
+            }
+        },
+        {
             "name": "x86_logging",
             "displayName": "x86 logging Target",
             "description": "Most of logging enabled",
@@ -121,6 +133,18 @@
             ]
         },
         {
+            "name": "debug-x64-rp",
+            "configurePreset": "x64_rp",
+            "configuration": "Debug",
+            "displayName": "x64 RP MemMapper Target Debug Build",
+            "description": "Build the x64 RP MemMapper target in Debug configuration",
+            "hidden": false,
+            "verbose": true,
+            "targets": [
+                "lib-test-cases_x64"
+            ]
+        },
+        {
             "name": "release-x64",
             "configurePreset": "x64",
             "configuration": "Release",
@@ -186,6 +210,17 @@
             "configuration": "Debug",
             "displayName": "x64 Target Debug Test",
             "description": "Run tests for x64 target in Debug configuration",
+            "hidden": false,
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "test-debug-x64-rp",
+            "configurePreset": "x64_rp",
+            "configuration": "Debug",
+            "displayName": "x64 RP MemMapper Target Debug Test",
+            "description": "Run tests for the x64 RP MemMapper target in Debug configuration",
             "hidden": false,
             "output": {
                 "outputOnFailure": true

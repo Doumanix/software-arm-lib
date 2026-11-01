@@ -34,10 +34,12 @@ MemMapper::MemMapper(const uint32_t flashBase, const uint32_t flashSize, const b
 
 void MemMapper::verifyAllocTable() const
 {
+    // The entries are addressed by their byte offset: with one byte entries (LPC11xx) this stays a
+    // plain byte access, so neither the on-flash format nor the optimized code changes.
     uint8_t zeroCounter = 0;
     for (uint32_t i = 0; i < allocTableSize; i++)
     {
-        if (allocationTablePtr[i] != 0)
+        if (reinterpret_cast<const AllocEntryType&>(allocationTablePtr[i * AllocEntryBytes]) != 0)
         {
             continue;
         }
@@ -62,7 +64,7 @@ void MemMapper::clearAllocTable() const
     static_cast<void>(doFlashAllocTable()); // static cast just to avoid compiler warning about unused return value
 }
 
-void MemMapper::writeAllocTableEntry(const uint8_t index, const uint8_t value) const
+void MemMapper::writeAllocTableEntry(const uint8_t index, const AllocEntryType value) const
 {
     if (readAllocTableEntry(index) == value)
     {
@@ -75,19 +77,19 @@ void MemMapper::writeAllocTableEntry(const uint8_t index, const uint8_t value) c
         writePage = allocationTablePageNumber;  // Set writePage to the alloc table page
         memcpy(ramBuffer, allocationTablePtr, ramBufferSize); // Copy alloc table from flash into ramBuffer
     }
-    ramBuffer[index] = value ^ 0xff;
+    reinterpret_cast<AllocEntryType&>(ramBuffer[index * AllocEntryBytes]) = value ^ AllocEntryXorMask;
     allocTableModified = true;
 }
 
-uint8_t MemMapper::readAllocTableEntry(const uint8_t index) const
+MemMapper::AllocEntryType MemMapper::readAllocTableEntry(const uint8_t index) const
 {
     if (writePage == allocationTablePageNumber)
     {
         // Alloc table is currently staged in ramBuffer, read from there
-        return ramBuffer[index] ^ 0xff;
+        return reinterpret_cast<const AllocEntryType&>(ramBuffer[index * AllocEntryBytes]) ^ AllocEntryXorMask;
     }
 
-    return allocationTablePtr[index] ^ 0xff;
+    return reinterpret_cast<const AllocEntryType&>(allocationTablePtr[index * AllocEntryBytes]) ^ AllocEntryXorMask;
 }
 
 void MemMapper::writeToFlashPage(const uint8_t* buffer, const uint32_t pageNumber)
@@ -221,9 +223,17 @@ MemMapper::Error MemMapper::addRange(const uint32_t virtAddress, const uint32_t 
 
     const uint32_t pages = length >> 8;
 
+    // The whole range must fit into the allocation table, not only its first page. The start page
+    // is at most allocTableSize - 1 here, so the remaining capacity cannot underflow; comparing
+    // the page count against it keeps the check free of an addition that could overflow.
+    if (pages > (allocTableSize - virtPage))
+    {
+        return Error::InvalidAddress;
+    }
+
     for (uint32_t page = virtPage; page < (pages + virtPage); page++)
     {
-        const uint8_t flashPageNum = readAllocTableEntry(page);
+        const AllocEntryType flashPageNum = readAllocTableEntry(page);
         if (flashPageNum != 0)
         {
             continue; // page already allocated

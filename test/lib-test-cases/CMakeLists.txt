@@ -71,6 +71,12 @@ add_compile_definitions(
     $<$<AND:$<CONFIG:Debug>,$<BOOL:${SBLIB_BUSMONITOR}>>:BUSMONITOR>
 )
 
+# Host tests of the RP2350 MemMapper code path: wide allocation-table entries plus a larger
+# simulated flash. Set by the x64_rp preset; reaches the sblib subdirectory like IAP_EMULATION.
+if(SBLIB_MEMMAPPER_LARGE_INDICES)
+    add_compile_definitions(MEMMAPPER_LARGE_INDICES)
+endif()
+
 # Conditionally add common compile definitions which have values e.g., SERIAL_SPEED=115200
 if(DEFINED SBLIB_PIO_FOR_TEL_END_IND AND NOT SBLIB_PIO_FOR_TEL_END_IND STREQUAL "" AND NOT SBLIB_PIO_FOR_TEL_END_IND STREQUAL "OFF")
     add_compile_definitions($<$<CONFIG:Debug>:PIO_FOR_TEL_END_IND=${SBLIB_PIO_FOR_TEL_END_IND}>)

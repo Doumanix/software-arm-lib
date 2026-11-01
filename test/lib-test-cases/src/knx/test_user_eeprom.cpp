@@ -20,21 +20,20 @@ struct TestSize
     uint32_t start;
     uint32_t size;
     uint32_t flashSize;
-    uint32_t resultFlashStart;
 };
 
 static std::vector<TestSize> testSizes = {
-    { 0, 1, 1, 0xffff },            // lower limit
-    { 0x100, 256,  256, 0xff00 },   // BCU 1
-    { 0x100, 1024, 1024, 0xfc00 },  // BCU 2
-    { 0x3f00, 3072, 4096, 0xf000 }, // Mask 0x0701, 0x0705
-    { 0x3300, 3072, 4096, 0xf000 }  // System B
+    { 0, 1, 1 },            // lower limit
+    { 0x100, 256,  256 },   // BCU 1
+    { 0x100, 1024, 1024 },  // BCU 2
+    { 0x3f00, 3072, 4096 }, // Mask 0x0701, 0x0705
+    { 0x3300, 3072, 4096 }  // System B
 };
 
 TEST_CASE("User EEPROM test", "[userEeprom]")
 {
     // Test declared ranges
-    for (const auto& [start, size, flashSize, resultFlashStart] : testSizes)
+    for (const auto& [start, size, flashSize] : testSizes)
     {
         // Test a new mcu with erased flash
         IAP_Init_Flash(0xff);
@@ -56,7 +55,8 @@ TEST_CASE("User EEPROM test", "[userEeprom]")
         // }
         // printf("i: %x\n", i);
         REQUIRE(validPage == (FLASH + iapFlashSize() - flashSize));
-        REQUIRE(validPage == (&FLASH[resultFlashStart]));
+        // The user EEPROM starts at the end of the simulated flash, whose size depends on the build
+        REQUIRE(validPage == (&FLASH[FLASH_SIZE - flashSize]));
         delete testUserEeprom;
     }
 }
