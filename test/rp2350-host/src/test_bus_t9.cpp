@@ -23,9 +23,9 @@
  */
 #include "bus_test_support.h"
 
-#include <sblib/eib/bus.h>
-#include <sblib/eib/bus_const.h>
-#include <sblib/io_pin_names.h>
+#include "sblib/eib/bus.h"
+#include "sblib/eib/bus_const.h"
+#include "sblib/io_pin_names.h"
 
 #include <algorithm>
 #include <cstdio>

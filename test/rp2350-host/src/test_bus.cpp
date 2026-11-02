@@ -19,10 +19,10 @@
 
 #include "bus_test_support.h"
 
-#include <sblib/eib/bus.h>
-#include <sblib/interrupt.h>
-#include <sblib/eib/addr_tables.h>
-#include <sblib/eib/bcu_const.h>
+#include "sblib/eib/addr_tables.h"
+#include "sblib/eib/bcu_const.h"
+#include "sblib/eib/bus.h"
+#include "sblib/interrupt.h"
 
 #include <algorithm>
 #include <cstdio>

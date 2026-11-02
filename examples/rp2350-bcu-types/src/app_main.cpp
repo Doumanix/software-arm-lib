@@ -20,24 +20,24 @@
  */
 
 #if defined(BCU_TYPE_BCU2)
-#   include <sblib/eibBCU2.h>
+#   include "sblib/eibBCU2.h"
 #elif defined(BCU_TYPE_MASK0701)
-#   include <sblib/eibMASK0701.h>
+#   include "sblib/eibMASK0701.h"
 #elif defined(BCU_TYPE_MASK0705)
-#   include <sblib/eibMASK0705.h>
+#   include "sblib/eibMASK0705.h"
 #elif defined(BCU_TYPE_SYSTEMB)
-#   include <sblib/eibSYSTEMB.h>
+#   include "sblib/eibSYSTEMB.h"
 #else
 #   error "No BCU type macro defined"
 #endif
 
-#include <sblib/digital_pin.h>
-#include <sblib/io_pin_names.h>
-#include <sblib/timeout.h>
+#include "sblib/digital_pin.h"
+#include "sblib/io_pin_names.h"
+#include "sblib/timeout.h"
 
 #if !defined(BCU_TYPE_BCU2)
-#   include <sblib/mem_mapper.h>
-#   include <sblib/platform.h>
+#   include "sblib/mem_mapper.h"
+#   include "sblib/platform.h"
 #endif
 
 constexpr int Manufacturer = 0x4c; // Selfbus test manufacturer

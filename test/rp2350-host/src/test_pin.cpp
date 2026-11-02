@@ -8,7 +8,9 @@
  * published by the Free Software Foundation.
  */
 #include <rp2350/digital_pin.cpp>
+
 #include "sblib/io_pin_names.h"
+
 #include <stdexcept>
 #include <catch.hpp>
 
