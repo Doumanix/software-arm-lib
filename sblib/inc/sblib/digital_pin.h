@@ -426,7 +426,10 @@ ALWAYS_INLINE void pinDisableInterrupt(const uint32_t pin)
  * @param pin   The pin to process, e.g. GPIO27
  * @return The GPIO number of the pin, e.g. 27
  */
-constexpr uint32_t digitalPinToGpio(const uint32_t pin) {return digitalPinToPort(pin) * 32 + digitalPinToPinNum(pin);}
+constexpr uint32_t digitalPinToGpio(const uint32_t pin)
+{
+    return digitalPinToPort(pin) * 32 + digitalPinToPinNum(pin);
+}
 
 /**
  * @brief Maps a GPIO port number to its corresponding IRQn.

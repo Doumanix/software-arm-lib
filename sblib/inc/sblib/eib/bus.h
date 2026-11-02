@@ -280,7 +280,8 @@ private:
 
 #if defined(SBLIB_RP2350_TIMER_STATS)
 /**
- * Diagnostics of @ref Bus::pause() (CMake option SBLIB_RP2350_TIMER_STATS, RP2350 only).
+ * @brief Diagnostics of @ref Bus::pause() (CMake option SBLIB_RP2350_TIMER_STATS, RP2350 only).
+ *
  * States are the values of the bus state machine (Bus::State).
  */
 struct BusPauseStats
@@ -299,7 +300,7 @@ struct BusPauseStats
 const volatile BusPauseStats& busPauseStats();
 
 /**
- * Get the longest pause() call of the previous run, kept in the watchdog scratch registers
+ * @brief Get the longest pause() call of the previous run, kept in the watchdog scratch registers
  * over a watchdog reboot (e.g. the restart by the ETS). Clears the record.
  *
  * @return true if a record was present

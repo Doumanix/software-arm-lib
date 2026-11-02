@@ -267,7 +267,7 @@ enum AnalogChannel : uint8_t
 #   undef FUNC3
 
 /**
- * Port pins of the RP2350 / RP2354.
+ * @brief Port pins of the RP2350 / RP2354.
  *
  * The value of a pin is its GPIO number, so the bits are used as with the LPC11xx:
  * Bit 0-4:   pin (0..31) within the 32 bit GPIO bank
@@ -299,7 +299,7 @@ enum PortPin : uint32_t
 };
 
 /**
- * Analog channels of the RP2350 ADC.
+ * @brief Analog channels of the RP2350 ADC.
  *
  * QFN-60 (RP2350A, Pico 2): AD0..AD3 = GPIO26..29.
  * QFN-80 (RP2350B, RP2354B): AD0..AD7 = GPIO40..47.
