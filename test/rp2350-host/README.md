@@ -77,6 +77,9 @@ together with ours, or sends a series of telegrams with repetitions like a downl
   3 repetitions each, separate counters for BUSY and NACK.
 - Download-like load: 50 MemoryWrite telegrams at the shortest spacing, a slow application
   (no acknowledge while the receive buffer is taken), lost acknowledges (no duplicate).
+- GPIO interrupt of the application during a download: an input pin with its own raw GPIO
+  handler (0, 5, 20 us) on IO_IRQ_BANK0, an edge every 997 us; all telegrams are received and
+  acknowledged once and every edge reaches the handler.
 - `pause()`/`resume()`: telegram while paused, `resume()` in the middle of a telegram,
   `pause()` waiting for the acknowledge, `pause(true)`, `pause()` during repetitions, flash
   writes (pauses) of 2..50 ms during a download, and the limit of about 85 ms
