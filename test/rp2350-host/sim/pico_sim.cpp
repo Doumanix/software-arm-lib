@@ -1372,6 +1372,12 @@ bool pio_sm_is_rx_fifo_empty(const PIO pio, const uint sm)
 
 uint pio_sm_get_tx_fifo_level(const PIO pio, const uint sm)
 {
+    // Polled until the state machine took words (timer.cpp pioTxSend()): with the busy wait model the time
+    // moves on as for a time read, so the scheduled take over of the pairs can happen.
+    if (!smOf(pio, sm).txFifo.empty())
+    {
+        readTime();
+    }
     return static_cast<uint>(smOf(pio, sm).txFifo.size());
 }
 

@@ -197,6 +197,8 @@ namespace
         // Start these frames together with our next data frames (offset after our start bit)
         std::vector<std::vector<uint8_t>> collideWith;
         uint32_t collideOffsetUs = 0;
+        // Called at the first pulse of each of our frames that is no acknowledge
+        std::function<void(uint64_t startUs)> onFrameStart;
 
         std::vector<TxFrame> ours; // our complete frames: data frames and acknowledges
         std::vector<Frame> sent;   // frames of the peer
@@ -296,6 +298,10 @@ namespace
             const uint64_t now = sim::now();
             if (level)
             {
+                if (pending.empty() && onFrameStart && !inAckSlot(now))
+                {
+                    onFrameStart(now);
+                }
                 if (pending.empty() && !collideWith.empty() && !inAckSlot(now))
                 {
                     send(now + collideOffsetUs, collideWith.front());
@@ -1549,6 +1555,212 @@ TEST_CASE("bus pause: a pause longer than the peer's 3 repetitions loses the tel
     for (const size_t i: {0u, 1u, 3u, 4u, 5u})
     {
         CHECK(r.peer->download.acknowledged[i]);
+    }
+}
+
+// ------------------------------------------------------------------ own telegram series with foreign traffic
+
+namespace
+{
+
+    // The application of example-txstresstest (group mode): one send buffer for all telegrams, the next
+    // group telegram (0/0/100..108 in turn) pauseUs after the bus finished the previous one (sendingFrame()).
+    struct StressApp
+    {
+        uint32_t pauseUs = 6000;
+        uint32_t wanted = 10;
+        std::vector<uint8_t> buffer = std::vector<uint8_t>(32, 0);
+        std::vector<std::vector<uint8_t>> expected; // with sender and checksum
+        std::vector<uint64_t> handedUs;
+        uint64_t sendingSeenUs = 0;
+        std::function<void(uint32_t index)> beforeSend;
+
+        void poll()
+        {
+            if (bus->sendingFrame())
+            {
+                sendingSeenUs = sim::now();
+                return;
+            }
+            if (expected.size() >= wanted || sim::now() < sendingSeenUs + pauseUs)
+            {
+                return;
+            }
+
+            const auto index = static_cast<uint32_t>(expected.size());
+            if (beforeSend)
+            {
+                beforeSend(index);
+            }
+            const std::vector<uint8_t> tel = {0xBC,
+                                              0x00,
+                                              0x00,
+                                              0x00,
+                                              static_cast<uint8_t>(GroupAddress + index % 9),
+                                              0xE1,
+                                              0x00,
+                                              static_cast<uint8_t>(0x80 | ((index / 9) & 1))};
+            std::copy(tel.begin(), tel.end(), buffer.begin());
+            bus->sendTelegram(buffer.data(), static_cast<uint16_t>(tel.size()));
+            auto withSender = tel;
+            withSender[1] = OwnAddress >> 8;
+            withSender[2] = OwnAddress & 0xff;
+            expected.push_back(withChecksum(withSender));
+            handedUs.push_back(sim::now());
+            sendingSeenUs = sim::now();
+        }
+    };
+
+    void runStress(StressApp& app, const uint64_t maxUs = 600000)
+    {
+        const uint64_t end = sim::now() + maxUs;
+        while (sim::now() < end && (app.expected.size() < app.wanted || bus->sendingFrame()))
+        {
+            sim::advance(50);
+            app.poll();
+        }
+        sim::advance(20000);
+    }
+
+    // Complete frames of ours: every telegram of the application in order, each at least once, repetitions only
+    // with the repeat flag cleared. Returns the number of repetitions; the pause starts at the end of the
+    // last transmission of the previous telegram.
+    uint32_t checkSeries(const Peer& peer, const StressApp& app)
+    {
+        REQUIRE(app.expected.size() == app.wanted);
+        std::vector<TxFrame> complete;
+        for (const auto& f: peer.dataFrames())
+        {
+            bool parityOk = true;
+            for (const auto& c: f.chars)
+            {
+                parityOk = parityOk && c.parityOk;
+            }
+            if (!f.collided && parityOk && f.chars.size() == app.expected[0].size())
+            {
+                complete.push_back(f);
+            }
+        }
+
+        uint32_t repetitions = 0;
+        size_t index = 0;
+        uint64_t lastEndUs = 0;
+        for (const auto& f: complete)
+        {
+            INFO("frame " << hex(f.bytes()) << " at " << f.startUs());
+            if (index > 0 && f.bytes() == repeated(app.expected[index - 1]))
+            {
+                ++repetitions;
+                lastEndUs = f.endOfStopUs();
+                continue;
+            }
+            REQUIRE(index < app.expected.size());
+            CHECK(f.bytes() == app.expected[index]);
+            if (index > 0)
+            {
+                CHECK(app.handedUs[index] >= lastEndUs + app.pauseUs);
+            }
+            lastEndUs = f.endOfStopUs();
+            ++index;
+        }
+        CHECK(index == app.expected.size());
+        CHECK(callback.finished == static_cast<int>(app.wanted));
+        CHECK(callback.lastSuccessful);
+        return repetitions;
+    }
+
+} // namespace
+
+TEST_CASE("bus series: foreign traffic during our telegrams loses no telegram of the series",
+          "[rp2350][bus][collision][series]")
+{
+    // example-txstresstest on the test board: own group telegrams with a pause, foreign telegrams in between.
+    // KNX 3/2/2 2.3.1/2.4.1: a collided frame is sent again (repeat flag unchanged), a frame without
+    // acknowledge is repeated (repeat flag cleared), the waiting telegram of the application is not lost.
+    constexpr uint32_t Target = 4;
+    startBus();
+    Peer peer;
+    peer.attach();
+    StressApp app;
+
+    SECTION("no foreign traffic")
+    {
+        runStress(app);
+        CHECK(checkSeries(peer, app) == 0);
+        CHECK(peer.dataFrames().size() == app.wanted);
+    }
+    SECTION("the peer starts together with our frame and wins in byte 2")
+    {
+        app.beforeSend = [&peer](const uint32_t index)
+        {
+            if (index == Target)
+            {
+                peer.collideWith.push_back(remoteGroupWrite(0));
+            }
+        };
+        runStress(app);
+        CHECK(checkSeries(peer, app) == 0);
+        REQUIRE(peer.dataFrames().size() == app.wanted + 1);
+        CHECK(peer.dataFrames()[Target].collided);
+    }
+    SECTION("a foreign frame instead of the acknowledge")
+    {
+        // bus.cpp handleTelegram(): a frame while waiting for the acknowledge -> repetition
+        peer.replies.assign(Target + 1, Reply::Ack);
+        peer.replies[Target] = Reply::None;
+        uint32_t frames = 0;
+        peer.onFrameStart = [&peer, &frames](const uint64_t startUs)
+        {
+            if (frames++ == Target)
+            {
+                const uint64_t end = endOfStop(startUs + 8 * CharTimeUs);
+                peer.send(end + AckDelayUs, remoteGroupWrite(1));
+            }
+        };
+        runStress(app);
+        CHECK(checkSeries(peer, app) == 1);
+    }
+    SECTION("a foreign edge off the bit raster stops our frame, a foreign frame follows 48 bit times later")
+    {
+        // bus.cpp SEND_BITS_OF_BYTE: falling edge shortly after our rising edge -> encounteredCollision(),
+        // initState(). Our byte 6 (0x00) is cut after bit 4 as in the test board capture (run 0730 of
+        // example-txstresstest), the other device starts after the idle time. Nobody acknowledges the cut frame.
+        peer.replies.assign(Target + 1, Reply::Ack);
+        peer.replies[Target] = Reply::None;
+        uint32_t frames = 0;
+        peer.onFrameStart = [&peer, &frames](const uint64_t startUs)
+        {
+            if (frames++ == Target)
+            {
+                const uint64_t edge = startUs + 6 * CharTimeUs + 5 * BitTime + PulseTime + 6;
+                sim::remoteLow(edge, PulseTime);
+                peer.send(edge + 48 * BitTime, remoteGroupWrite(1));
+            }
+        };
+        runStress(app);
+        CHECK(checkSeries(peer, app) == 0);
+        REQUIRE(peer.dataFrames().size() == app.wanted + 1);
+        const TxFrame cut = peer.dataFrames()[Target];
+        CHECK(cut.chars.size() == 7);
+        REQUIRE(bus->telegramReceived());
+        CHECK(std::vector<uint8_t>(bus->telegram, bus->telegram + bus->telegramLen) == remoteGroupWrite(1));
+        const auto foreign = std::find_if(peer.sent.begin(), peer.sent.end(),
+                                          [](const Peer::Frame& f) { return f.bytes == remoteGroupWrite(1); });
+        REQUIRE(foreign != peer.sent.end());
+        CHECK(peer.acknowledgeOf(*foreign) != nullptr);
+    }
+    SECTION("a foreign frame starts while our telegram is handed over")
+    {
+        app.beforeSend = [&peer](const uint32_t index)
+        {
+            if (index == Target)
+            {
+                peer.send(sim::now() + 1, remoteGroupWrite(1));
+            }
+        };
+        runStress(app);
+        CHECK(checkSeries(peer, app) == 0);
+        CHECK(peer.dataFrames().size() == app.wanted);
     }
 }
 

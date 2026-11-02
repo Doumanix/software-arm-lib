@@ -70,6 +70,11 @@ together with ours, or sends a series of telegrams with repetitions like a downl
   (COLLISION_RETRY_MAX); our ACK against the NACK of another receiver. With the KNX bus by PIO
   (`_pio`): a peer 1..20 us before our start bit, our start bit synced to it ends 35 us after the
   peer's edge as on the LPC11xx.
+- Own telegram series like `example-txstresstest` (one send buffer, the next telegram a pause
+  after the previous one) with foreign traffic: a collision, a foreign frame instead of the
+  acknowledge (repetition), a foreign edge off the bit raster that stops our frame followed by a
+  foreign frame, a foreign frame while our telegram is handed over. Every telegram of the series
+  is sent completely in order, the pause starts after its last transmission.
 - Reception with bit jitter (data bits -40..+70 us, pulse width 25/50 us, longer pause between
   characters) and spikes (idle bus 1..10 us, inside a 1 bit, a dropout inside a 0 bit, a spike
   just before a 0 bit); afterwards a clean telegram must be received (no stuck state).
