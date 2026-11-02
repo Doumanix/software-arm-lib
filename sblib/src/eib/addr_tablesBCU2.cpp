@@ -48,6 +48,6 @@ uint8_t* AddrTablesBCU2::assocTable()
 uint16_t AddrTablesBCU2::addrCount()
 {
     const uint8_t* ptrAddrTable = addrTable();
-    const uint16_t count = makeWord(*(ptrAddrTable + 1), *ptrAddrTable);
+    const uint16_t count = *ptrAddrTable; // the second byte is the high byte of the individual address
     return (count);
 }
