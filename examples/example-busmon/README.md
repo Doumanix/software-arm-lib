@@ -11,3 +11,10 @@ following byte-format (with-out spaces):
 CC aa bb cc dd ee
 CC             the number of telegram-bytes to be send
 aa,bb,cc,dd,ee the telegram data (without the checksum)
+
+RP2350 (Pico 2 test board)
+--------------------------
+CMake preset `rp2350-pico2` (`CMakeLists.txt`). Serial port is UART1: Tx GPIO8, Rx GPIO9,
+115200 baud (`src/rp2350/serial_rp2350.cpp`). The build uses a flash size of 2 MiB, so the
+storage of the example (UserEeprom) does not overwrite the storage of an application at the
+end of the 4 MiB flash.
