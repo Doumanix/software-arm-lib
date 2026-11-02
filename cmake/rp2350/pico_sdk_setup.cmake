@@ -15,6 +15,7 @@
 #   PICO_TOOLCHAIN_PATH environment ARM_TOOLCHAIN_PATH or MCUXPRESSO_TOOLCHAIN_PATH,
 #                       so LPC1115 and RP2350 are built with the same arm-none-eabi GCC
 #   picotool_DIR        environment PICOTOOL_DIR (picotool >= 2.1.1)
+#   PICO_LINKER_SCRIPT_PATH  sblib/linker/rp2350 (SDK memory map with the bus interrupt path in RAM)
 
 if(DEFINED PROJECT_NAME)
     message(FATAL_ERROR "pico_sdk_setup.cmake must be included before project()")
@@ -48,6 +49,13 @@ endif()
 # Point the environment variable PICOTOOL_DIR to a directory containing picotoolConfig.cmake.
 if(NOT picotool_DIR AND DEFINED ENV{PICOTOOL_DIR} AND NOT "$ENV{PICOTOOL_DIR}" STREQUAL "")
     set(picotool_DIR "$ENV{PICOTOOL_DIR}" CACHE PATH "Directory containing picotoolConfig.cmake")
+endif()
+
+# Memory map: the Pico SDK memory map with the functions of the bus, timer and PIO interrupts
+# in RAM (sblib/linker/rp2350/memmap_default.ld). Only the default binary type is provided;
+# set PICO_LINKER_SCRIPT_PATH to the SDK directory for the plain SDK memory maps.
+if(NOT PICO_LINKER_SCRIPT_PATH)
+    get_filename_component(PICO_LINKER_SCRIPT_PATH "${CMAKE_CURRENT_LIST_DIR}/../../sblib/linker/rp2350" ABSOLUTE)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/pico_sdk_import.cmake")
