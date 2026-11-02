@@ -56,17 +56,17 @@ namespace
     }
 
     // Offset in us of bit k (0 start bit, 1..8 data bits, 9 parity bit) of remote character n
-    using BitOffset = std::function<int(size_t n, unsigned k)>;
-    const BitOffset noOffset = [](size_t, unsigned) { return 0; };
+    using BitOffset = std::function<int(size_t n, uint32_t k)>;
+    const BitOffset noOffset = [](size_t, uint32_t) { return 0; };
     // BitOffset result: do not send this 0 bit (the test sends its own pulses instead)
     constexpr int OmitBit = -100000;
 
     // Positions (0 start bit .. 9 parity bit) of the 0 bits of a character
-    std::vector<unsigned> zeroBits(const uint8_t value)
+    std::vector<uint32_t> zeroBits(const uint8_t value)
     {
-        std::vector<unsigned> zeros = {0};
+        std::vector<uint32_t> zeros = {0};
         int ones = 0;
-        for (unsigned bit = 0; bit < 8; ++bit)
+        for (uint32_t bit = 0; bit < 8; ++bit)
         {
             if (value & (1u << bit))
             {
@@ -86,12 +86,12 @@ namespace
 
     // Another device sends the bytes with shifted bit edges; character n nominally at startUs + n * 1352 us
     void remoteSendTimed(const uint64_t startUs, const std::vector<uint8_t>& bytes, const BitOffset& offset,
-                         const unsigned pulseUs = PulseTime)
+                         const uint32_t pulseUs = PulseTime)
     {
         for (size_t n = 0; n < bytes.size(); ++n)
         {
             const int64_t charStart = static_cast<int64_t>(startUs + n * RemoteCharUs);
-            for (const unsigned k: zeroBits(bytes[n]))
+            for (const uint32_t k: zeroBits(bytes[n]))
             {
                 const int o = offset(n, k);
                 if (o != OmitBit)
@@ -138,7 +138,7 @@ namespace
     }
 
     // MemoryWrite of 4 bytes to us (connection oriented, sequence number seq), 15 bytes with checksum
-    std::vector<uint8_t> memoryWrite(const unsigned seq, const uint16_t address)
+    std::vector<uint8_t> memoryWrite(const uint32_t seq, const uint16_t address)
     {
         return withChecksum({0xB0, 0x11, 0x02, OwnAddress >> 8, OwnAddress & 0xff, 0x67,
                              static_cast<uint8_t>(0x42 | ((seq & 15) << 2)), 0x84, static_cast<uint8_t>(address >> 8),
@@ -196,7 +196,7 @@ namespace
         Reply otherwise = Reply::Ack;
         // Start these frames together with our next data frames (offset after our start bit)
         std::vector<std::vector<uint8_t>> collideWith;
-        unsigned collideOffsetUs = 0;
+        uint32_t collideOffsetUs = 0;
 
         std::vector<TxFrame> ours; // our complete frames: data frames and acknowledges
         std::vector<Frame> sent;   // frames of the peer
@@ -207,8 +207,8 @@ namespace
             std::vector<std::vector<uint8_t>> telegrams; // with checksum, repeat flag set
             std::vector<size_t> missFirstAck;            // indices: the peer does not hear our first ACK
             size_t current = 0;
-            unsigned attempt = 0;
-            std::vector<unsigned> attempts; // transmissions per telegram
+            uint32_t attempt = 0;
+            std::vector<uint32_t> attempts; // transmissions per telegram
             std::vector<bool> acknowledged;
             bool done = false;
             uint64_t doneUs = 0;
@@ -310,7 +310,7 @@ namespace
                 return;
             }
             pulseOpen = false;
-            pending.push_back({pulseStartUs, static_cast<unsigned int>(now - pulseStartUs)});
+            pending.push_back({pulseStartUs, static_cast<uint32_t>(now - pulseStartUs)});
             const size_t count = pending.size();
             sim::atHardware(std::max(pulseStartUs + FrameGapUs, now),
                             [this, count]()
@@ -405,7 +405,7 @@ namespace
     // The application: takes received telegrams in its main loop, needs processUs per telegram
     struct Consumer
     {
-        unsigned processUs = 0;
+        uint32_t processUs = 0;
         std::function<void()> onTelegram; // e.g. a flash write with bus pause, runs in the main loop
         std::vector<std::vector<uint8_t>> received;
         std::vector<uint64_t> receivedUs;
@@ -434,7 +434,7 @@ namespace
     };
 
     // Main loop: run the simulation for us microseconds, the consumer polls every stepUs
-    void runMain(Consumer& consumer, const uint64_t us, const unsigned stepUs = 50)
+    void runMain(Consumer& consumer, const uint64_t us, const uint32_t stepUs = 50)
     {
         const uint64_t end = sim::now() + us;
         while (sim::now() < end)
@@ -467,13 +467,13 @@ namespace
                 lost = " lost";
             }
             std::snprintf(buf, sizeof(buf), "  ours%s  %s  (end of stop %llu, raster max %d us)", lost,
-                          hex(f.bytes()).c_str(), static_cast<unsigned long long>(f.endOfStopUs()), maxOffset);
+                          hex(f.bytes()).c_str(), static_cast<uint64_t>(f.endOfStopUs()), maxOffset);
             lines.push_back({f.startUs(), buf});
         }
         for (const auto& f: peer.sent)
         {
             std::snprintf(buf, sizeof(buf), "  peer  %s  (end of stop %llu)", hex(f.bytes).c_str(),
-                          static_cast<unsigned long long>(f.endOfStopUs()));
+                          static_cast<uint64_t>(f.endOfStopUs()));
             lines.push_back({f.startUs, buf});
         }
         std::stable_sort(lines.begin(), lines.end(), [](const Line& a, const Line& b) { return a.t < b.t; });
@@ -485,8 +485,8 @@ namespace
             {
                 deltaUs = l.t - last;
             }
-            std::printf("  t=%llu dt=%llu%s\n", static_cast<unsigned long long>(l.t),
-                        static_cast<unsigned long long>(deltaUs), l.text.c_str());
+            std::printf("  t=%llu dt=%llu%s\n", static_cast<uint64_t>(l.t),
+                        static_cast<uint64_t>(deltaUs), l.text.c_str());
             last = l.t;
         }
         std::printf("  finished=%d ok=%d\n", callback.finished, callback.lastSuccessful);
@@ -525,7 +525,7 @@ namespace
         for (size_t n = 0; n < std::min(ours.size(), remote.size()); ++n)
         {
             const auto zo = zeroBits(ours[n]);
-            for (const unsigned k: zeroBits(remote[n]))
+            for (const uint32_t k: zeroBits(remote[n]))
             {
                 if (std::find(zo.begin(), zo.end(), k) == zo.end())
                 {
@@ -759,7 +759,7 @@ namespace
      * start t0. Afterwards a clean telegram checks that the bus is not stuck.
      */
     RxResult receiveWith(const std::vector<uint8_t>& tel, const BitOffset& offset,
-                         const std::function<void(uint64_t t0)>& extra = {}, const unsigned pulseUs = PulseTime)
+                         const std::function<void(uint64_t t0)>& extra = {}, const uint32_t pulseUs = PulseTime)
     {
         startBus();
         Peer peer;
@@ -805,7 +805,7 @@ namespace
     // All data and parity bits (not the start bits) shifted by d us
     BitOffset dataBits(const int d)
     {
-        return [d](size_t, const unsigned k)
+        return [d](size_t, const uint32_t k)
         {
             if (k == 0)
             {
@@ -818,7 +818,7 @@ namespace
     // Data and parity bits alternately early by e and late by l
     BitOffset alternating(const int e, const int l)
     {
-        return [e, l](const size_t n, const unsigned k)
+        return [e, l](const size_t n, const uint32_t k)
         {
             if (k == 0)
             {
@@ -835,7 +835,7 @@ namespace
     // Character 1 (start bit and all bits) shifted by d: the pause after character 0 is longer by d
     BitOffset secondCharacter(const int d)
     {
-        return [d](const size_t n, unsigned)
+        return [d](const size_t n, uint32_t)
         {
             if (n == 1)
             {
@@ -975,7 +975,7 @@ namespace
 {
 
     // Short low pulses on the bus at t0 + atUs
-    std::function<void(uint64_t)> spikes(const std::vector<std::pair<int64_t, unsigned>>& atAndWidth)
+    std::function<void(uint64_t)> spikes(const std::vector<std::pair<int64_t, uint32_t>>& atAndWidth)
     {
         return [atAndWidth](const uint64_t t0)
         {
@@ -997,7 +997,7 @@ TEST_CASE("bus spikes: short pulses on the idle bus do not disturb the next tele
 {
     // bus.cpp:651-683 ignores a falling edge if the bus is high again within ZERO_BIT_MIN_TIME (3 us,
     // bus_const.h:106); a longer pulse starts the reception of a (wrong) character
-    for (const unsigned width: {1u, 2u, 3u, 4u, 6u, 10u})
+    for (const uint32_t width: {1u, 2u, 3u, 4u, 6u, 10u})
     {
         DYNAMIC_SECTION("spike " << width << " us, 3 ms before the telegram")
         {
@@ -1022,7 +1022,7 @@ TEST_CASE("bus spikes: inside a telegram", "[rp2350][bus][spike]")
         {
             // 2nd falling edge: captured, but too early for the next bit, bus.cpp ignores it
             // (bus.cpp:857-862)
-            const BitOffset omit = [](const size_t n, const unsigned k)
+            const BitOffset omit = [](const size_t n, const uint32_t k)
             {
                 if (n == 1 && k == 3)
                 {
@@ -1034,10 +1034,10 @@ TEST_CASE("bus spikes: inside a telegram", "[rp2350][bus][spike]")
                                       [at](const uint64_t t0)
                                       {
                                           sim::remoteLow(static_cast<uint64_t>(static_cast<int64_t>(t0) + ZeroBitUs),
-                                                         static_cast<unsigned int>(at));
+                                                         static_cast<uint32_t>(at));
                                           sim::remoteLow(
                                                   static_cast<uint64_t>(static_cast<int64_t>(t0) + ZeroBitUs + at + 1),
-                                                  static_cast<unsigned int>(PulseTime - at - 1));
+                                                  static_cast<uint32_t>(PulseTime - at - 1));
                                       }));
         }
     }
@@ -1203,7 +1203,7 @@ namespace
      * without our acknowledge. The application takes each telegram after processUs. afterStart runs after the
      * start of the bus (e.g. further interrupt sources).
      */
-    void runDownload(DownloadResult& r, const size_t count, const unsigned processUs,
+    void runDownload(DownloadResult& r, const size_t count, const uint32_t processUs,
                      const std::vector<size_t>& missFirstAck = {}, const std::function<void()>& onTelegram = {},
                      const std::function<void()>& afterStart = {})
     {
@@ -1216,7 +1216,7 @@ namespace
         for (size_t i = 0; i < count; ++i)
         {
             r.peer->download.telegrams.push_back(
-                    memoryWrite(static_cast<unsigned int>(i), static_cast<uint16_t>(0x4000 + 4 * i)));
+                    memoryWrite(static_cast<uint32_t>(i), static_cast<uint16_t>(0x4000 + 4 * i)));
         }
         r.peer->download.missFirstAck = missFirstAck;
         r.consumer.processUs = processUs;
@@ -1270,7 +1270,7 @@ TEST_CASE("bus load: a slow application gets every telegram once through the rep
     DownloadResult r;
     runDownload(r, 20, 35000);
     checkDelivered(r, 20);
-    unsigned repetitions = 0;
+    uint32_t repetitions = 0;
     for (size_t i = 0; i < 20; ++i)
     {
         CHECK(r.peer->download.acknowledged[i]);
@@ -1297,8 +1297,8 @@ namespace
     // Input pin of the application with its own GPIO interrupt (e.g. a hand actuation button). All GPIOs share
     // IO_IRQ_BANK0, also the RX edge interrupt of the bus without PIO (timer.cpp, gpio_add_raw_irq_handler).
     constexpr uint AppPin = 6;
-    unsigned appIrqCount = 0;
-    unsigned appEdgeCount = 0;
+    uint32_t appIrqCount = 0;
+    uint32_t appEdgeCount = 0;
     bool appEdgesOn = false;
     uint32_t appHandlerUs = 0; // duration of the application's interrupt handler (busy wait)
 
@@ -1499,12 +1499,12 @@ TEST_CASE("bus pause: download with a flash write (pause) after some telegrams l
 {
     // The application pauses the bus for the flash write when a telegram arrives. The peer repeats
     // the telegrams that came during the pause; with 3 repetitions this covers about 3 x 28 ms.
-    for (const unsigned flashUs: {2000u, 20000u, 50000u})
+    for (const uint32_t flashUs: {2000u, 20000u, 50000u})
     {
         DYNAMIC_SECTION("flash write " << flashUs << " us after every 4th telegram")
         {
             DownloadResult r;
-            unsigned count = 0;
+            uint32_t count = 0;
             runDownload(r, 12, 0, {},
                         [&count, flashUs]()
                         {
@@ -1532,7 +1532,7 @@ TEST_CASE("bus pause: a pause longer than the peer's 3 repetitions loses the tel
     // A longer pause loses the telegram that arrives meanwhile (the transport layer of the sender
     // would have to repeat it).
     DownloadResult r;
-    unsigned count = 0;
+    uint32_t count = 0;
     runDownload(r, 6, 0, {},
                 [&count]()
                 {
@@ -1609,7 +1609,7 @@ TEST_CASE("bus explore t9: jitter and spikes", "[.explore]")
                     static_cast<long long>(r.ackDelayUs), r.recovered);
     }
     std::printf("spike in a 1 bit (+50 us): width received\n");
-    for (const unsigned w: {1u, 2u, 3u, 4u, 5u, 6u})
+    for (const uint32_t w: {1u, 2u, 3u, 4u, 5u, 6u})
     {
         const auto r = receiveWith(toUs, noOffset, spikes({{OneBitUs + 50, w}}));
         std::printf("  %u us  %d %d\n", w, r.received, r.recovered);
@@ -1642,18 +1642,18 @@ TEST_CASE("bus explore t9: BUSY and NACK", "[.explore]")
 
 TEST_CASE("bus explore t9: download and pause", "[.explore]")
 {
-    for (const unsigned processUs: {0u, 35000u})
+    for (const uint32_t processUs: {0u, 35000u})
     {
         DownloadResult r;
         runDownload(r, 50, processUs, {3});
-        unsigned frames = 0;
+        uint32_t frames = 0;
         for (const auto a: r.peer->download.attempts)
         {
             frames += a;
         }
         std::printf("download 50 x MemoryWrite, application %u us per telegram, peer misses ACK of #3: %llu us, "
                     "%u frames, taken %zu\n",
-                    processUs, static_cast<unsigned long long>(r.peer->download.doneUs - r.peer->sent[0].startUs),
+                    processUs, static_cast<uint64_t>(r.peer->download.doneUs - r.peer->sent[0].startUs),
                     frames, r.consumer.received.size());
         std::printf("  attempts:");
         for (const auto a: r.peer->download.attempts)
@@ -1662,10 +1662,10 @@ TEST_CASE("bus explore t9: download and pause", "[.explore]")
         }
         std::printf("\n");
     }
-    for (const unsigned flashUs: {2000u, 20000u, 50000u, 80000u, 100000u, 150000u})
+    for (const uint32_t flashUs: {2000u, 20000u, 50000u, 80000u, 100000u, 150000u})
     {
         DownloadResult r;
-        unsigned count = 0;
+        uint32_t count = 0;
         std::vector<uint64_t> pauseUs;
         runDownload(r, 12, 0, {},
                     [&count, &pauseUs, flashUs]()
@@ -1696,7 +1696,7 @@ TEST_CASE("bus explore t9: download and pause", "[.explore]")
         std::printf(", pause() waited:");
         for (const auto p: pauseUs)
         {
-            std::printf(" %llu", static_cast<unsigned long long>(p));
+            std::printf(" %llu", static_cast<uint64_t>(p));
         }
         std::printf(" us\n");
     }
@@ -1710,6 +1710,6 @@ TEST_CASE("bus explore t9: download and pause", "[.explore]")
         const uint64_t before = sim::now();
         bus->pause(false);
         std::printf("pause() during the repetitions without acknowledge took %llu us\n",
-                    static_cast<unsigned long long>(sim::now() - before));
+                    static_cast<uint64_t>(sim::now() - before));
     }
 }

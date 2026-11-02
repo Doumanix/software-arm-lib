@@ -31,10 +31,10 @@ namespace piomodel
     class StateMachine
     {
     public:
-        static constexpr unsigned FifoDepth = 4;
+        static constexpr uint32_t FifoDepth = 4;
 
-        StateMachine(const uint16_t* program, const unsigned length, const unsigned wrapTarget, const unsigned wrap,
-                     const unsigned startPc) :
+        StateMachine(const uint16_t* program, const uint32_t length, const uint32_t wrapTarget, const uint32_t wrap,
+                     const uint32_t startPc) :
             memory(program, program + length),
             wrapTarget(wrapTarget),
             wrap(wrap),
@@ -42,7 +42,7 @@ namespace piomodel
         {}
 
         // EXECCTRL STATUS: TX FIFO level below statusN (all ones) or not (0)
-        void statusTxLessThan(const unsigned level) { statusN = level; }
+        void statusTxLessThan(const uint32_t level) { statusN = level; }
 
         // One cycle of the state machine
         void step()
@@ -84,11 +84,11 @@ namespace piomodel
         std::deque<uint32_t> rxFifo;
         std::vector<uint64_t> outputChanges; // cycles in which the output pin changed
 
-        [[nodiscard]] unsigned pc() const { return programCounter; }
+        [[nodiscard]] uint32_t pc() const { return programCounter; }
         [[nodiscard]] uint64_t cycle() const { return cycleCount; }
 
     private:
-        uint32_t movSource(const unsigned src) const
+        uint32_t movSource(const uint32_t src) const
         {
             switch (src)
             {
@@ -131,9 +131,9 @@ namespace piomodel
         // Returns false if the instruction stalls
         bool execute(const uint16_t instr, bool& jumped)
         {
-            const unsigned op = instr >> 13;
-            const unsigned arg1 = (instr >> 5) & 0x7u;
-            const unsigned arg2 = instr & 0x1fu;
+            const uint32_t op = instr >> 13;
+            const uint32_t arg1 = (instr >> 5) & 0x7u;
+            const uint32_t arg2 = instr & 0x1fu;
             switch (op)
             {
                 case 0: // JMP
@@ -221,8 +221,8 @@ namespace piomodel
                 }
                 case 5: // MOV
                 {
-                    const unsigned operation = (instr >> 3) & 0x3u;
-                    const unsigned src = instr & 0x7u;
+                    const uint32_t operation = (instr >> 3) & 0x3u;
+                    const uint32_t src = instr & 0x7u;
                     uint32_t value = movSource(src);
                     if (operation == 1)
                     {
@@ -276,11 +276,11 @@ namespace piomodel
         }
 
         std::vector<uint16_t> memory;
-        unsigned wrapTarget;
-        unsigned wrap;
-        unsigned programCounter;
-        unsigned statusN = 1;
-        unsigned delay = 0;
+        uint32_t wrapTarget;
+        uint32_t wrap;
+        uint32_t programCounter;
+        uint32_t statusN = 1;
+        uint32_t delay = 0;
         uint64_t cycleCount = 0;
     };
 

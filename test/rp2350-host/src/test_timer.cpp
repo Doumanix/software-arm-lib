@@ -39,7 +39,7 @@ namespace
         uint8_t timerNum;
         uint64_t timeUs;
         int flags;
-        unsigned int value;
+        uint32_t value;
     };
 
     std::vector<HandlerCall> calls;
@@ -101,7 +101,7 @@ namespace
         return result;
     }
 
-    constexpr unsigned BitPulseTime = 35; // bus.cpp BIT_PULSE_TIME
+    constexpr uint32_t BitPulseTime = 35; // bus.cpp BIT_PULSE_TIME
 
 } // namespace
 
@@ -270,7 +270,7 @@ TEST_CASE("RP2350 timer: RESET cycle has MR + 1 microseconds", "[rp2350][timer]"
 
     sim::runUntil(t0 + 99 + 10 * 100);
     REQUIRE(calls.size() == 11);
-    for (unsigned k = 0; k < calls.size(); ++k)
+    for (uint32_t k = 0; k < calls.size(); ++k)
     {
         INFO("cycle " << k);
         CHECK(calls[k].timeUs == t0 + 99 + 100 * k);
@@ -295,7 +295,7 @@ TEST_CASE("RP2350 timer: STOP stops the counter at the match value", "[rp2350][t
 TEST_CASE("RP2350 timer: RESET holds the match value for one microsecond (value and capture)", "[rp2350][timer]")
 {
     fresh();
-    unsigned int captureInIrq = 0;
+    uint32_t captureInIrq = 0;
     handlerHook = [&](uint8_t)
     {
         if (timer16_1.flag(TIMER_MATCH_MAT2) && calls.size() == 1)
@@ -472,7 +472,7 @@ namespace
 {
 
     // Configure timer16_1 like Bus::begin() and the first bit of a telegram (bus.cpp sendNextTelegram)
-    uint64_t startBusPulse(const unsigned pulseStart)
+    uint64_t startBusPulse(const uint32_t pulseStart)
     {
         timer16_1.setIRQPriority(InterruptPriority::highest);
         timer16_1.begin();
@@ -968,7 +968,7 @@ TEST_CASE("RP2350 timer: an edge one RESET cycle later at a close timer value is
     REQUIRE(timer16_1.value() == 71);
     sim::fallingEdge(PIN_EIB_RX); // next cycle, timer value 71
 
-    std::vector<unsigned> captures; // timer values of the capture interrupts
+    std::vector<uint32_t> captures; // timer values of the capture interrupts
     for (const auto& c: calls)
     {
         if (c.flags & Timer::flagMask(CAP0))
@@ -976,7 +976,7 @@ TEST_CASE("RP2350 timer: an edge one RESET cycle later at a close timer value is
             captures.push_back(c.value);
         }
     }
-    CHECK(captures == std::vector<unsigned>{69, 69, 71});
+    CHECK(captures == std::vector<uint32_t>{69, 69, 71});
 }
 
 TEST_CASE("RP2350 timer: edges closer than 8 us are captured also over a RESET", "[rp2350][timer][capture]")
@@ -998,7 +998,7 @@ TEST_CASE("RP2350 timer: edges closer than 8 us are captured also over a RESET",
     sim::advance(3);
     sim::fallingEdge(PIN_EIB_RX); // 3 us later: captured
 
-    std::vector<unsigned> captures;
+    std::vector<uint32_t> captures;
     for (const auto& c: calls)
     {
         if (c.flags & Timer::flagMask(CAP0))
@@ -1006,7 +1006,7 @@ TEST_CASE("RP2350 timer: edges closer than 8 us are captured also over a RESET",
             captures.push_back(c.value);
         }
     }
-    CHECK(captures == std::vector<unsigned>{101, 2, 5});
+    CHECK(captures == std::vector<uint32_t>{101, 2, 5});
     CHECK(stats.shortGapCaptures == 2);
     CHECK(stats.shortGapUs[3] == 1);
     CHECK(stats.shortGapUs[5] == 1);
@@ -1252,7 +1252,7 @@ TEST_CASE("RP2350 timer PIO: the capture value is the timer value of the edge, a
     // The timer interrupt handler runs 30 us (match MAT1); an edge 5 us into it is captured with its own time.
     // The software capture of the GPIO interrupt would read the time after the handler.
     fresh();
-    unsigned int captured = 0;
+    uint32_t captured = 0;
     uint64_t captureCallUs = 0;
     handlerHook = [&](uint8_t)
     {
@@ -1399,7 +1399,7 @@ namespace
      */
     struct TxProgramRun
     {
-        explicit TxProgramRun(const unsigned lagCycles) :
+        explicit TxProgramRun(const uint32_t lagCycles) :
             sm(txProgramInstructions, TxProgramLength, TxProgramStart, TxProgramWrap, TxProgramStart),
             lag(lagCycles)
         {
@@ -1446,7 +1446,7 @@ namespace
         }
 
         piomodel::StateMachine sm;
-        unsigned lag;
+        uint32_t lag;
     };
 
     // Encoded "none" for TxProgramRun::send()
@@ -1458,7 +1458,7 @@ TEST_CASE("RP2350 PIO TX program: 10 cycles per microsecond on every path, X fol
 {
     // A pair written in every cycle position of the microsecond, edges 3 us ahead: every path of the loop
     // (idle, wait, command, edge) runs, X must stay -TIMERAWL (checked in runToCycle())
-    for (unsigned offset = 0; offset < TxCyclesPerUs; ++offset)
+    for (uint32_t offset = 0; offset < TxCyclesPerUs; ++offset)
     {
         TxProgramRun run(1);
         run.runToCycle(50 * TxCyclesPerUs + offset);
@@ -1472,9 +1472,9 @@ TEST_CASE("RP2350 PIO TX program: 10 cycles per microsecond on every path, X fol
 TEST_CASE("RP2350 PIO TX program: the edges come in the 4th cycle of their microsecond, confirmation -t",
           "[rp2350][pio]")
 {
-    for (const unsigned lag: {0u, 1u, 2u})
+    for (const uint32_t lag: {0u, 1u, 2u})
     {
-        for (unsigned offset = 0; offset < TxCyclesPerUs; ++offset)
+        for (uint32_t offset = 0; offset < TxCyclesPerUs; ++offset)
         {
             INFO("lag " << lag << " cycles, written in cycle " << offset << " of the microsecond");
             TxProgramRun run(lag);
@@ -1499,10 +1499,10 @@ TEST_CASE("RP2350 PIO TX program: the edges come in the 4th cycle of their micro
 TEST_CASE("RP2350 PIO TX program: 2 us lead are enough, 1 us is not (PioTargetLeadUs = 3 keeps 1 us margin)",
           "[rp2350][pio]")
 {
-    unsigned missedWithOneUs = 0;
-    for (const unsigned lag: {0u, 1u, 2u})
+    uint32_t missedWithOneUs = 0;
+    for (const uint32_t lag: {0u, 1u, 2u})
     {
-        for (unsigned offset = 0; offset < TxCyclesPerUs; ++offset)
+        for (uint32_t offset = 0; offset < TxCyclesPerUs; ++offset)
         {
             for (const uint32_t leadUs: {1u, 2u})
             {
@@ -1600,7 +1600,7 @@ TEST_CASE("RP2350 PIO RX program: one word per falling edge of the input pin", "
     CHECK(sm.rxFifo.empty());
 
     std::vector<uint64_t> fallCycles;
-    unsigned pushes = 0;
+    uint32_t pushes = 0;
     // 0 bits of 35 us and a spike of one cycle, clk_sys (150 cycles per microsecond)
     const std::vector<std::pair<uint64_t, bool>> levels = {
             {100, true},    {200, false}, {200 + 35 * 150, true}, {200 + 104 * 150, false}, {200 + 139 * 150, true},
