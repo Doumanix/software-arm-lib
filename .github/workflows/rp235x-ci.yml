@@ -127,8 +127,13 @@ jobs:
         working-directory: apps/software-arm-lib/test/rp2350-host
         run: |
           cmake --workflow --preset host-test
-          for t in cmake-build/host/rp2350_*_tests; do
-            [ -x "$t" ] && echo "$(basename "$t"): $("$t" | tail -2 | head -1)" >> "$GITHUB_STEP_SUMMARY"
+          # every target (including the _pio ones) must exist and pass; a missing one fails the job
+          for n in rp2350_host_tests rp2350_bus_tests rp2350_iap_tests rp2350_pin_tests \
+                   rp2350_host_tests_pio rp2350_bus_tests_pio rp2350_pin_tests_pio; do
+            t="cmake-build/host/$n"
+            if [ ! -x "$t" ]; then echo "$n: MISSING" | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; fi
+            out=$("$t") || { echo "$n: FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; echo "$out" | tail -20; exit 1; }
+            echo "$n: $(echo "$out" | grep 'All tests passed')" | tee -a "$GITHUB_STEP_SUMMARY"
           done
 
       - name: RP2350 examples
