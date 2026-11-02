@@ -3,6 +3,7 @@
  *
  *  Created on: 19.11.2021
  *      Author: dridders
+ *      Author: Doumanix <doumanix@gmx.de>
  */
 
 #include <sblib/eib/com_objectsSYSTEMB.h>
@@ -95,6 +96,39 @@ void ComObjectsSYSTEMB::processGroupTelegram(const uint16_t addr, const int apci
             }
         }
     }
+}
+
+int ComObjectsSYSTEMB::firstObjectAddr(const int objno) const
+{
+    // Spec: Resources 4.11.4 Group Object Association Table - Realization Type 6
+    const uint8_t* assocTab = bcu->addrTables->assocTable();
+    const uint8_t* addrTab = bcu->addrTables->addrTable();
+    if ((assocTab == nullptr) || (addrTab == nullptr))
+    {
+        return (0);
+    }
+
+    const int addrCount = bcu->addrTables->addrCount();
+    const int endAssoc = 2 + makeWord(assocTab[0], assocTab[1]) * 4; // 2 octets length, 4 octets per entry
+
+    for (int idx = 2; idx < endAssoc; idx += 4)
+    {
+        if (makeWord(assocTab[idx + 2], assocTab[idx + 3]) != objno)
+        {
+            continue;
+        }
+
+        // The address table has a 2 octet length field and no individual address, index 1 is the first group address
+        const int addressTablePos = makeWord(assocTab[idx], assocTab[idx + 1]);
+        if ((addressTablePos < 1) || (addressTablePos > addrCount))
+        {
+            continue;
+        }
+
+        const uint8_t* addr = addrTab + (addressTablePos << 1);
+        return (makeWord(addr[0], addr[1]));
+    }
+    return (0);
 }
 
 uint8_t* ComObjectsSYSTEMB::objectConfigTable()

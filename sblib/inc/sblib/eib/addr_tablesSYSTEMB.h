@@ -26,17 +26,16 @@ public:
      * @param addr - the address to find.
      * @return The index of the address, -1 if not found.
      *
-     * @brief The address table contains the configured group addresses and our
-     * own physical address. This function skips the own physical address and
-     * only scans the group addresses.
+     * @brief The address table starts with a 16 bit count followed by the
+     * configured group addresses. The index of the first group address is 1.
      */
     int indexOfAddr(int addr) override;
 
     /**
-     * Get total number of address entries
-     * @return The 16 bit count from the first two bytes of the table
+     * Get the number of group addresses
+     * @return The big endian 16 bit count from the first two bytes of the table
      *
-     * @brief SYSTEMB uses a 16 bit count; see ComObjects::firstObjectAddr().
+     * @brief The SYSTEMB address table does not contain the individual address.
      */
     uint16_t addrCount() override;
 

@@ -34,6 +34,6 @@ int AddrTablesSYSTEMB::indexOfAddr(const int addr)
 uint16_t AddrTablesSYSTEMB::addrCount()
 {
     const uint8_t* ptrAddrTable = addrTable();
-    const uint16_t count = makeWord(*(ptrAddrTable + 1), *ptrAddrTable);
+    const uint16_t count = makeWord(*ptrAddrTable, *(ptrAddrTable + 1)); // big endian, without the individual address
     return (count);
 }

@@ -325,7 +325,7 @@ protected:
      * @param objno - the ID of the communication object
      * @return The group address, or 0 if none found.
      */
-    int firstObjectAddr(int objno) const;
+    virtual int firstObjectAddr(int objno) const;
 
     /**
      * Create and send a group read request telegram.
