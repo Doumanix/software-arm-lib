@@ -7,5 +7,8 @@
  * it under the terms of the GNU General Public License version 3 as
  * published by the Free Software Foundation.
  */
-#pragma once
+#ifndef SBLIB_TEST_RP2350_SIM_HARDWARE_PIO_H_
+#define SBLIB_TEST_RP2350_SIM_HARDWARE_PIO_H_
 #include "../pico_sim.h"
+
+#endif /* SBLIB_TEST_RP2350_SIM_HARDWARE_PIO_H_ */
