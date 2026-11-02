@@ -35,40 +35,40 @@ namespace piomodel
 
         StateMachine(const uint16_t* program, const unsigned length, const unsigned wrapTarget, const unsigned wrap,
                      const unsigned startPc) :
-            memory_(program, program + length),
-            wrapTarget_(wrapTarget),
-            wrap_(wrap),
-            pc_(startPc)
+            memory(program, program + length),
+            wrapTarget(wrapTarget),
+            wrap(wrap),
+            programCounter(startPc)
         {}
 
         // EXECCTRL STATUS: TX FIFO level below statusN (all ones) or not (0)
-        void statusTxLessThan(const unsigned statusN) { statusN_ = statusN; }
+        void statusTxLessThan(const unsigned level) { statusN = level; }
 
         // One cycle of the state machine
         void step()
         {
-            ++cycle_;
-            if (delay_ > 0)
+            ++cycleCount;
+            if (delay > 0)
             {
-                --delay_;
+                --delay;
                 return;
             }
-            const uint16_t instr = memory_.at(pc_);
+            const uint16_t instr = memory.at(programCounter);
             bool jumped = false;
             if (!execute(instr, jumped))
             {
                 return; // stalled: the same instruction again in the next cycle, no delay
             }
-            delay_ = (instr >> 8) & 0x1fu;
+            delay = (instr >> 8) & 0x1fu;
             if (!jumped)
             {
-                if (pc_ == wrap_)
+                if (programCounter == wrap)
                 {
-                    pc_ = wrapTarget_;
+                    programCounter = wrapTarget;
                 }
                 else
                 {
-                    ++pc_;
+                    ++programCounter;
                 }
             }
         }
@@ -84,8 +84,8 @@ namespace piomodel
         std::deque<uint32_t> rxFifo;
         std::vector<uint64_t> outputChanges; // cycles in which the output pin changed
 
-        [[nodiscard]] unsigned pc() const { return pc_; }
-        [[nodiscard]] uint64_t cycle() const { return cycle_; }
+        [[nodiscard]] unsigned pc() const { return programCounter; }
+        [[nodiscard]] uint64_t cycle() const { return cycleCount; }
 
     private:
         uint32_t movSource(const unsigned src) const
@@ -105,7 +105,7 @@ namespace piomodel
                 case 3:
                     return 0;
                 case 5:
-                    if (txFifo.size() < statusN_)
+                    if (txFifo.size() < statusN)
                     {
                         return 0xffffffffu;
                     }
@@ -123,7 +123,7 @@ namespace piomodel
         {
             if (level != outputPin)
             {
-                outputChanges.push_back(cycle_);
+                outputChanges.push_back(cycleCount);
             }
             outputPin = level;
         }
@@ -169,7 +169,7 @@ namespace piomodel
                     }
                     if (take)
                     {
-                        pc_ = arg2;
+                        programCounter = arg2;
                         jumped = true;
                     }
                     return true;
@@ -275,13 +275,13 @@ namespace piomodel
             }
         }
 
-        std::vector<uint16_t> memory_;
-        unsigned wrapTarget_;
-        unsigned wrap_;
-        unsigned pc_;
-        unsigned statusN_ = 1;
-        unsigned delay_ = 0;
-        uint64_t cycle_ = 0;
+        std::vector<uint16_t> memory;
+        unsigned wrapTarget;
+        unsigned wrap;
+        unsigned programCounter;
+        unsigned statusN = 1;
+        unsigned delay = 0;
+        uint64_t cycleCount = 0;
     };
 
 } // namespace piomodel
