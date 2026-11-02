@@ -125,10 +125,10 @@ namespace
         InterruptPriority priority = InterruptPriority::medium;
 
         uint32_t prescaler = 0;
-        uint32_t startUs = 0;          // system time at timer value 0
+        uint32_t startUs = 0;      // system time at timer value 0
         uint32_t stoppedValue = 0; // timer value while stopped
-        uint32_t stoppedCycle = 0;     // counter cycle (16 bit wraps) when stopped
-        bool holdActive = false;       // after a RESET: the microsecond before startUs reads holdValue
+        uint32_t stoppedCycle = 0; // counter cycle (16 bit wraps) when stopped
+        bool holdActive = false;   // after a RESET: the microsecond before startUs reads holdValue
         uint32_t holdValue = 0;    // match value of the RESET (the LPC11xx holds it for one tick)
 
         uint32_t matchValue[MatchChannels] = {0xffff, 0xffff, 0xffff, 0xffff};
@@ -141,7 +141,7 @@ namespace
         bool matchLevel[MatchChannels] = {};
         bool pulseEndPending = false; // bus PWM: pulse ends at the counter reset after the MAT2 event
         uint32_t pulseEndUs = 0;
-        uint32_t pulseStartUs = 0;     // bus PWM: actual start of the pulse (TX HIGH)
+        uint32_t pulseStartUs = 0; // bus PWM: actual start of the pulse (TX HIGH)
         uint32_t pulseWidthUs = 0; // bus PWM: nominal width MAT2 + 1 - MAT0
 
         uint32_t captureValue[CaptureChannels] = {};
@@ -1983,8 +1983,7 @@ namespace
 
 Timer::Timer(const uint8_t aTimerNum) :
     timerNum(aTimerNum)
-{
-}
+{}
 
 void Timer::begin() const
 {

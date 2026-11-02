@@ -485,8 +485,8 @@ namespace
             {
                 deltaUs = l.t - last;
             }
-            std::printf("  t=%llu dt=%llu%s\n", static_cast<uint64_t>(l.t),
-                        static_cast<uint64_t>(deltaUs), l.text.c_str());
+            std::printf("  t=%llu dt=%llu%s\n", static_cast<uint64_t>(l.t), static_cast<uint64_t>(deltaUs),
+                        l.text.c_str());
             last = l.t;
         }
         std::printf("  finished=%d ok=%d\n", callback.finished, callback.lastSuccessful);
@@ -937,8 +937,7 @@ TEST_CASE("bus jitter: bit edges far outside the window are rejected, the bus re
     }
 }
 
-TEST_CASE("bus jitter: bit edges 34..68 us late are accepted (tolerated like Darth's bus.cpp)",
-          "[rp2350][bus][jitter]")
+TEST_CASE("bus jitter: bit edges 34..68 us late are accepted (tolerated like Darth's bus.cpp)", "[rp2350][bus][jitter]")
 {
     // Accepted behaviour (deliberately tolerated): the KNX window is
     // n*104 -7/+33 us (bus_const.h:37, 111), bus.cpp:848-852 only sets RX_TIMING_ERROR_SPIKE for an
@@ -1653,8 +1652,8 @@ TEST_CASE("bus explore t9: download and pause", "[.explore]")
         }
         std::printf("download 50 x MemoryWrite, application %u us per telegram, peer misses ACK of #3: %llu us, "
                     "%u frames, taken %zu\n",
-                    processUs, static_cast<uint64_t>(r.peer->download.doneUs - r.peer->sent[0].startUs),
-                    frames, r.consumer.received.size());
+                    processUs, static_cast<uint64_t>(r.peer->download.doneUs - r.peer->sent[0].startUs), frames,
+                    r.consumer.received.size());
         std::printf("  attempts:");
         for (const auto a: r.peer->download.attempts)
         {

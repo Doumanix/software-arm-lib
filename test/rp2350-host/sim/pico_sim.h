@@ -12,10 +12,10 @@
  *  them (32 bit single transfers, DREQ of a PIO RX FIFO or unpaced, chaining, IRQ 0). The RX state
  *  machine pushes one word per falling edge of its input pin. The TX state machine counts X down once per
  *  microsecond while enabled. Its TX FIFO takes pairs of edge times (ISR, OSR); a pair written in the
- *  microsecond w is compared from w + 2 on (worst case of the real program), at most one pair per microsecond. When X reaches
- *  ISR, the pin toggles, X is pushed as confirmation and OSR becomes the next edge time. An edge time that X
- *  already passed would wait for the 32 bit wrap of X (71 minutes): the simulation throws. A GPIO with a PIO
- *  function (pio_gpio_init, gpio_set_function) is driven by the state machine only, gpio_put() then changes
+ *  microsecond w is compared from w + 2 on (worst case of the real program), at most one pair per microsecond.
+ *  When X reaches ISR, the pin toggles, X is pushed as confirmation and OSR becomes the next edge time. An edge
+ *  time that X already passed would wait for the 32 bit wrap of X (71 minutes): the simulation throws. A GPIO with
+ *  a PIO function (pio_gpio_init, gpio_set_function) is driven by the state machine only, gpio_put() then changes
  *  just the SIO output latch.
  *
  *  Interrupt model as the NVIC of the Cortex-M33: an interrupt runs if interrupts are enabled
