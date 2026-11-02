@@ -155,4 +155,11 @@ TEST_CASE("SYSTEMB address table count excludes the individual address", "[addr_
         CHECK(table.indexOfAddr(0x20ff) == 256);
         CHECK(table.indexOfAddr(0xa55a) == -1);
     }
+
+    SECTION("address count keeps the 16 bit value")
+    {
+        table.bytes[0] = 0x01;
+        table.bytes[1] = 0x02;
+        CHECK(table.addrCount() == 0x0201);
+    }
 }
