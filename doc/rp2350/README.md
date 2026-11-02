@@ -64,7 +64,8 @@ SYSTEMB).
 
 The bus code (`sblib/src/eib/bus.cpp`) is shared with the LPC11xx and uses the LPC11xx timer
 interface. On the RP2350 `sblib/src/rp2350/timer.cpp` emulates that interface from the 1 MHz
-system timer.
+system timer. The bus interrupt path runs from RAM (`sblib/linker/rp2350/memmap_default.ld`,
+see the porting guide, "Interrupt code in RAM").
 
 - **PIO bus (`SBLIB_RP2350_PIO_BUS=ON`, default):** a PIO state machine detects the falling edges
   of the RX pin and DMA copies the system time of each edge, so the capture value does not depend
