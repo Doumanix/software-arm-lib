@@ -3,6 +3,7 @@
  *
  *  Created on: 20.11.2021
  *      Author: dridders
+ *      Author: Doumanix <doumanix@gmx.de>
  */
 
 #include <sblib/eib/addr_tablesSYSTEMB.h>
@@ -28,4 +29,11 @@ int AddrTablesSYSTEMB::indexOfAddr(const int addr)
     }
 
     return -1;
+}
+
+uint16_t AddrTablesSYSTEMB::addrCount()
+{
+    const uint8_t* ptrAddrTable = addrTable();
+    const uint16_t count = makeWord(*(ptrAddrTable + 1), *ptrAddrTable);
+    return (count);
 }

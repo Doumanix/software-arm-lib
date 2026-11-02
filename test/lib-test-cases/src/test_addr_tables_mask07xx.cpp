@@ -86,6 +86,14 @@ TEMPLATE_TEST_CASE("MASK07xx address table count includes the individual address
         CHECK(f.bcu.addrTables->indexOfAddr(0xa55a) == -1);
     }
 
+    SECTION("address count is the first byte of the table")
+    {
+        f.table()[0] = 2;
+        f.putAddress(0, 0x1165);
+        f.putAddress(1, 0x0064);
+        CHECK(f.bcu.addrTables->addrCount() == 2);
+    }
+
     SECTION("table address outside of the user memory finds nothing")
     {
         f.bcu.userEeprom->addrTabAddr() = 0x0100; // BCU2 EEPROM, not mapped by the mask

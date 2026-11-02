@@ -95,6 +95,32 @@ TEST_CASE("BCU2 address table count includes the individual address", "[addr_tab
     }
 }
 
+TEST_CASE("BCU2 address count is the first byte of the table", "[addr_tables_bcu2]")
+{
+    TestAddrTablesBCU2 table;
+
+    SECTION("individual address with high byte zero")
+    {
+        table.bytes[0] = 3;
+        putAddress(table.bytes.data() + 1, 0, 0x0065);
+        CHECK(table.addrCount() == 3);
+    }
+
+    SECTION("individual address with high byte not zero")
+    {
+        table.bytes[0] = 3;
+        putAddress(table.bytes.data() + 1, 0, 0x1165);
+        CHECK(table.addrCount() == 3);
+    }
+
+    SECTION("maximum count")
+    {
+        table.bytes[0] = 255;
+        putAddress(table.bytes.data() + 1, 0, 0xffff);
+        CHECK(table.addrCount() == 255);
+    }
+}
+
 TEST_CASE("SYSTEMB address table count excludes the individual address", "[addr_tables_bcu2]")
 {
     TestAddrTablesSYSTEMB table;
@@ -128,5 +154,12 @@ TEST_CASE("SYSTEMB address table count excludes the individual address", "[addr_
         putAddress(table.bytes.data() + 2, n, 0xa55a);
         CHECK(table.indexOfAddr(0x20ff) == 256);
         CHECK(table.indexOfAddr(0xa55a) == -1);
+    }
+
+    SECTION("address count keeps the 16 bit value")
+    {
+        table.bytes[0] = 0x01;
+        table.bytes[1] = 0x02;
+        CHECK(table.addrCount() == 0x0201);
     }
 }
