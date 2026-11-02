@@ -156,10 +156,13 @@ TEST_CASE("SYSTEMB address table count excludes the individual address", "[addr_
         CHECK(table.indexOfAddr(0xa55a) == -1);
     }
 
-    SECTION("address count keeps the 16 bit value")
+    SECTION("address count is the big endian 16 bit value")
     {
+        table.bytes[0] = 0x00;
+        table.bytes[1] = 0x03;
+        CHECK(table.addrCount() == 3);
         table.bytes[0] = 0x01;
         table.bytes[1] = 0x02;
-        CHECK(table.addrCount() == 0x0201);
+        CHECK(table.addrCount() == 0x0102);
     }
 }
