@@ -2,7 +2,8 @@
  *  test_bus_t9.cpp - More host tests of the KNX TP1 bus (sblib src/eib/bus.cpp, unchanged) on the
  *                    simulated bus line: collision and arbitration with a second
  *                    sender, reception with bit jitter and spikes, BUSY and NACK acknowledge, a
- *                    download-like load, pause()/resume().
+ *                    download-like load (also with GPIO interrupts of the application),
+ *                    pause()/resume().
  *
  *  The other device on the bus is the Peer model. It watches our TX pin (sim::onPinChange), decodes
  *  our frames and acknowledges them (ACK, NACK, BUSY or nothing), can start its own frame together
@@ -34,6 +35,8 @@
 #include <vector>
 
 #include <hardware/gpio.h> // simulation: sim::
+#include <hardware/irq.h>
+#include <hardware/timer.h>
 
 #include <catch.hpp> // If possible, include catch.hpp as last header
 
@@ -1197,12 +1200,18 @@ namespace
     /**
      * The peer sends count MemoryWrite telegrams to us, each 50 bit times after our acknowledge of the
      * previous one (the shortest spacing for the same priority), and repeats a telegram up to 3 times
-     * without our acknowledge. The application takes each telegram after processUs.
+     * without our acknowledge. The application takes each telegram after processUs. afterStart runs after the
+     * start of the bus (e.g. further interrupt sources).
      */
     void runDownload(DownloadResult& r, const size_t count, const unsigned processUs,
-                     const std::vector<size_t>& missFirstAck = {}, const std::function<void()>& onTelegram = {})
+                     const std::vector<size_t>& missFirstAck = {}, const std::function<void()>& onTelegram = {},
+                     const std::function<void()>& afterStart = {})
     {
         startBus();
+        if (afterStart)
+        {
+            afterStart();
+        }
         r.peer->attach();
         for (size_t i = 0; i < count; ++i)
         {
@@ -1278,6 +1287,94 @@ TEST_CASE("bus load: a repetition after a lost acknowledge is acknowledged but n
     checkDelivered(r, 10);
     CHECK(r.peer->download.attempts[3] == 2);
     CHECK(r.peer->download.attempts[7] == 2);
+}
+
+// ------------------------------------------------------------------ GPIO interrupt of the application
+
+namespace
+{
+
+    // Input pin of the application with its own GPIO interrupt (e.g. a hand actuation button). All GPIOs share
+    // IO_IRQ_BANK0, also the RX edge interrupt of the bus without PIO (timer.cpp, gpio_add_raw_irq_handler).
+    constexpr uint AppPin = 6;
+    unsigned appIrqCount = 0;
+    unsigned appEdgeCount = 0;
+    bool appEdgesOn = false;
+    uint32_t appHandlerUs = 0; // duration of the application's interrupt handler (busy wait)
+
+    void appPinIrq()
+    {
+        if (!(gpio_get_irq_event_mask(AppPin) & GPIO_IRQ_EDGE_FALL))
+        {
+            return;
+        }
+        gpio_acknowledge_irq(AppPin, GPIO_IRQ_EDGE_FALL);
+        ++appIrqCount;
+        const uint64_t endUs = time_us_64() + appHandlerUs;
+        while (time_us_64() < endUs)
+        {
+            // the handler is busy
+        }
+    }
+
+    // Falling edges on the application pin every periodUs from startUs on, while appEdgesOn
+    void appEdges(const uint64_t startUs, const uint32_t periodUs)
+    {
+        sim::atHardware(startUs,
+                        [=]()
+                        {
+                            if (!appEdgesOn)
+                            {
+                                return;
+                            }
+                            ++appEdgeCount;
+                            sim::fallingEdge(AppPin);
+                            appEdges(startUs + periodUs, periodUs);
+                        });
+    }
+
+} // namespace
+
+TEST_CASE("bus load: GPIO interrupts of the application during a download disturb neither side",
+          "[rp2350][bus][load][pin]")
+{
+    // An edge every 997 us (no multiple of the bit time, longer than any interrupt lock of the bus), the
+    // application's handler takes 0, 5 or 20 us. Without PIO an application edge just before an RX edge delays
+    // the capture of the RX edge by the handler time (same interrupt), the bit window of bus.cpp tolerates this.
+    for (const uint32_t handlerUs: {0u, 5u, 20u})
+    {
+        DYNAMIC_SECTION("application handler " << handlerUs << " us")
+        {
+            DownloadResult r;
+            appIrqCount = 0;
+            appEdgeCount = 0;
+            appHandlerUs = handlerUs;
+            runDownload(r, 30, 0, {}, {},
+                        []()
+                        {
+                            gpio_set_irq_enabled(AppPin, GPIO_IRQ_EDGE_FALL, true);
+                            gpio_add_raw_irq_handler(AppPin, appPinIrq);
+                            irq_set_enabled(IO_IRQ_BANK0, true);
+                            appEdgesOn = true;
+                            appEdges(sim::now() + 500, 997);
+                        });
+            appEdgesOn = false;
+            sim::advance(2000); // the handler of the last edge has finished
+            gpio_remove_raw_irq_handler(AppPin, appPinIrq);
+            gpio_set_irq_enabled(AppPin, GPIO_IRQ_EDGE_FALL, false);
+
+            checkDelivered(r, 30);
+            for (size_t i = 0; i < 30; ++i)
+            {
+                INFO("telegram " << i);
+                CHECK(r.peer->download.attempts[i] == 1);
+                CHECK(r.peer->download.acknowledged[i]);
+            }
+            CHECK(r.peer->dataFrames().empty());
+            CHECK(appEdgeCount > 500); // the download takes about 0.8 s
+            CHECK(appIrqCount == appEdgeCount);
+        }
+    }
 }
 
 // ------------------------------------------------------------------ pause() / resume()
