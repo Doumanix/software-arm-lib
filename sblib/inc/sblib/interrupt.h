@@ -70,7 +70,8 @@ void interrupts();
 void waitForInterrupt();
 
 /**
- * Wait for an enabled interrupt with PRIMASK set, preserving the mask on return.
+ * @brief Wait for an enabled interrupt with PRIMASK set, preserving the mask on return.
+ *
  * Call from privileged Thread mode with no other priority mask blocking the wake IRQ.
  * The caller must re-enable interrupts to dispatch the handler and recheck its condition.
  * WFI may also return without an interrupt. This does not configure peripheral sleep clocks.
@@ -296,6 +297,8 @@ FORCE_INLINE bool getInterruptEnabled(const IRQn_Type interruptType)
 }
 
 /**
+ * @brief Set the priority of an interrupt.
+ *
  * The Cortex-M33 of the RP2350 has 16 priority levels (4 bits, upper nibble of the 8 bit
  * hardware priority). The four @ref InterruptPriority levels are spread over the full range:
  * highest = 0x00, high = 0x40, medium = 0x80 (= PICO_DEFAULT_IRQ_PRIORITY), low = 0xc0.

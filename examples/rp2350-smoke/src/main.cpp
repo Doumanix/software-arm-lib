@@ -17,15 +17,16 @@
  * published by the Free Software Foundation.
  */
 
-#include <cstdio>
-#include "pico/stdlib.h"
+#include "sblib/digital_pin.h"
+#include "sblib/internal/iap.h"
+#include "sblib/interrupt.h"
+#include "sblib/io_pin_names.h"
+#include "sblib/timer.h"
 
+#include <cstdio>
 #include <cstring>
-#include <sblib/digital_pin.h>
-#include <sblib/internal/iap.h>
-#include <sblib/interrupt.h>
-#include <sblib/io_pin_names.h>
-#include <sblib/timer.h>
+
+#include "pico/stdlib.h"
 
 static_assert(digitalPinToGpio(GPIO47) == 47, "GPIO encoding");
 static_assert(digitalPinToPort(GPIO40) == PIO1 && digitalPinToPinNum(GPIO40) == 8, "GPIO bank encoding");

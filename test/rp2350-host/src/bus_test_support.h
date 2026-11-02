@@ -23,14 +23,14 @@
 namespace bustest
 {
 
-    constexpr unsigned BitTime = 104;       // bus.cpp BIT_TIME
-    constexpr unsigned PulseTime = 35;      // bus.cpp BIT_PULSE_TIME
-    constexpr unsigned CharBits = 13;       // start, 8 data, parity, stop, 2 pause
+    constexpr uint32_t BitTime = 104;       // bus.cpp BIT_TIME
+    constexpr uint32_t PulseTime = 35;      // bus.cpp BIT_PULSE_TIME
+    constexpr uint32_t CharBits = 13;       // start, 8 data, parity, stop, 2 pause
     constexpr uint16_t OwnAddress = 0x1165; // 1.1.101
     constexpr uint16_t GroupAddress = 100;  // 0/0/100
 
-    constexpr unsigned CharTimeUs = 10 * BitTime + 313; // bus.cpp: stop bit + BIT_TIMES_DELAY(3) to next start bit
-    constexpr unsigned AckDelayUs = 1563;               // BIT_TIMES_DELAY(15) after the end of the stop bit
+    constexpr uint32_t CharTimeUs = 10 * BitTime + 313; // bus.cpp: stop bit + BIT_TIMES_DELAY(3) to next start bit
+    constexpr uint32_t AckDelayUs = 1563;               // BIT_TIMES_DELAY(15) after the end of the stop bit
 
     class TestCallback : public CallbackBus
     {
@@ -59,13 +59,13 @@ namespace bustest
         uint8_t value;
         bool parityOk;
         int maxBitOffsetUs; // largest deviation of a pulse from the 104 us raster
-        std::vector<unsigned> widths;
+        std::vector<uint32_t> widths;
     };
 
     struct Pulse
     {
         uint64_t startUs;
-        unsigned widthUs;
+        uint32_t widthUs;
     };
 
     std::vector<Pulse> txPulses();

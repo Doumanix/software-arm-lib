@@ -145,12 +145,12 @@ TEST_CASE_METHOD(FlashFixture, "IAP address conversions and device identity", "[
     REQUIRE(iapAddressOfPage(63) == end - 256);
     REQUIRE(iapSectorOfAddress(end - 1) == 3);
     REQUIRE(iapPageOfAddress(end - 1) == 63);
-    unsigned partId = 0;
+    uint32_t partId = 0;
     REQUIRE(iapReadPartID(&partId) == IAP_SUCCESS);
     REQUIRE(partId == 0x2350);
     uint8_t uid[IAP_UID_LENGTH];
     REQUIRE(iapReadUID(uid) == IAP_SUCCESS);
-    for (unsigned i = 0; i < IAP_UID_LENGTH; ++i)
+    for (uint32_t i = 0; i < IAP_UID_LENGTH; ++i)
     {
         uint8_t expected = 0;
         if (i < 8)

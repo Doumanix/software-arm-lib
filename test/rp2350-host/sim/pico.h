@@ -7,8 +7,11 @@
  * it under the terms of the GNU General Public License version 3 as
  * published by the Free Software Foundation.
  */
-#pragma once
+#ifndef SBLIB_TEST_RP2350_SIM_PICO_H_
+#define SBLIB_TEST_RP2350_SIM_PICO_H_
 #include "pico_sim.h"
 
 #define PARAM_ASSERTIONS_ENABLED(x) 0
 #define valid_params_if(x, test) ((void)0)
+
+#endif /* SBLIB_TEST_RP2350_SIM_PICO_H_ */

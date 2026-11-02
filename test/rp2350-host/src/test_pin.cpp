@@ -8,7 +8,9 @@
  * published by the Free Software Foundation.
  */
 #include <rp2350/digital_pin.cpp>
+
 #include "sblib/io_pin_names.h"
+
 #include <stdexcept>
 #include <catch.hpp>
 
@@ -22,7 +24,7 @@ namespace
             std::fill(std::begin(interruptEvents), std::end(interruptEvents), 0);
         }
     };
-    unsigned irqCalls = 0;
+    uint32_t irqCalls = 0;
     void onPinIrq()
     {
         ++irqCalls;
@@ -154,7 +156,7 @@ TEST_CASE_METHOD(PinFixture, "Pin interrupt modes select and retain SDK events",
                               INTERRUPT_EDGE_BOTH};
     const uint32_t events[] = {GPIO_IRQ_LEVEL_LOW, GPIO_IRQ_LEVEL_HIGH, GPIO_IRQ_EDGE_FALL, GPIO_IRQ_EDGE_RISE,
                                GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE};
-    for (unsigned i = 0; i < 5; ++i)
+    for (uint32_t i = 0; i < 5; ++i)
     {
         sim::fallingEdge(7);
         pinInterruptMode(7, modes[i], PULL_UP);

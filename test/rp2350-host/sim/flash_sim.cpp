@@ -21,8 +21,8 @@ namespace sim
 {
     bool failErase = false;
     bool failProgram = false;
-    unsigned eraseCalls = 0;
-    unsigned programCalls = 0;
+    uint32_t eraseCalls = 0;
+    uint32_t programCalls = 0;
     void resetFlash()
     {
         memset(FLASH, 0xff, PICO_FLASH_SIZE_BYTES);

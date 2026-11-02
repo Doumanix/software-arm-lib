@@ -16,7 +16,7 @@ namespace sim
     void resetFlash();
     extern bool failErase;
     extern bool failProgram;
-    extern unsigned eraseCalls;
-    extern unsigned programCalls;
+    extern uint32_t eraseCalls;
+    extern uint32_t programCalls;
 } // namespace sim
 #endif

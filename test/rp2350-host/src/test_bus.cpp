@@ -19,10 +19,10 @@
 
 #include "bus_test_support.h"
 
-#include <sblib/eib/bus.h>
-#include <sblib/interrupt.h>
-#include <sblib/eib/addr_tables.h>
-#include <sblib/eib/bcu_const.h>
+#include "sblib/eib/addr_tables.h"
+#include "sblib/eib/bcu_const.h"
+#include "sblib/eib/bus.h"
+#include "sblib/interrupt.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -62,7 +62,7 @@ namespace bustest
         {
             if (log[i].level && !log[i + 1].level)
             {
-                result.push_back({log[i].timeUs, static_cast<unsigned int>(log[i + 1].timeUs - log[i].timeUs)});
+                result.push_back({log[i].timeUs, static_cast<uint32_t>(log[i + 1].timeUs - log[i].timeUs)});
             }
         }
         return result;
@@ -78,7 +78,7 @@ namespace bustest
             int ones = 0;
             bool parity = true;
             size_t j = i + 1;
-            for (unsigned bit = 1; bit <= 10; ++bit)
+            for (uint32_t bit = 1; bit <= 10; ++bit)
             {
                 const int64_t expected = static_cast<int64_t>(c.startUs) + bit * BitTime;
                 bool zero = false;
@@ -132,7 +132,7 @@ namespace bustest
             const uint8_t b = bytes[n];
             int ones = 0;
             sim::remoteLow(charStart, PulseTime); // start bit
-            for (unsigned bit = 0; bit < 8; ++bit)
+            for (uint32_t bit = 0; bit < 8; ++bit)
             {
                 if (b & (1u << bit))
                 {
@@ -191,7 +191,7 @@ namespace bustest
                 deltaUs = static_cast<long long>(chars[n].startUs - chars[n - 1].startUs);
             }
             std::printf("  #%zu t=%llu dt=%lld 0x%02x parity=%d maxOffset=%d widths:", n,
-                        static_cast<unsigned long long>(chars[n].startUs), deltaUs, chars[n].value, chars[n].parityOk,
+                        static_cast<uint64_t>(chars[n].startUs), deltaUs, chars[n].value, chars[n].parityOk,
                         chars[n].maxBitOffsetUs);
             for (const auto w: chars[n].widths)
             {
@@ -256,9 +256,9 @@ uint32_t SystemCoreClock = SYS_CLK_HZ;
 void setKNX_TX_Pin(int)
 {}
 
-unsigned int millis()
+uint32_t millis()
 {
-    return static_cast<unsigned int>(sim::now() / 1000);
+    return static_cast<uint32_t>(sim::now() / 1000);
 }
 
 namespace bustest
@@ -491,8 +491,8 @@ TEST_CASE("bus: a slow timer interrupt handler (bus.cpp from flash) keeps the fr
 {
     // The TX edge interrupt interrupts the handler, the match processing follows it.
     // Up to 40 us per handler call in total (test board: at most 30 us in the alarm interrupt, 38 us in the
-    // RX edge interrupt). With the RX edge interrupt above the TX edge this failed from 40 us on; from 60 us on bus.cpp misses its
-    // next match also with the TX edge interrupt (the handler runs into the next bit).
+    // RX edge interrupt). With the RX edge interrupt above the TX edge this failed from 40 us on; from 60 us on
+    // bus.cpp misses its next match also with the TX edge interrupt (the handler runs into the next bit).
     const std::vector<uint8_t> longTelegram = {0xBC, 0x00, 0x00, 0x00, 0x01, 0x64, 0x62, 0x41, 0x01, 0x0E, 0xE0};
     for (const uint32_t before: {0u, 10u, 30u})
     {
@@ -584,7 +584,7 @@ TEST_CASE("bus explore: send and receive timing", "[.explore]")
     sim::advance(50000);
     const uint64_t endOfStop = t0 + (rx.size() - 1) * CharBits * BitTime + 11 * BitTime;
     printChars("receive, our ACK:", decodeTx());
-    std::printf("end of last stop bit t=%llu, telegramReceived=%d len=%d\n", static_cast<unsigned long long>(endOfStop),
+    std::printf("end of last stop bit t=%llu, telegramReceived=%d len=%d\n", static_cast<uint64_t>(endOfStop),
                 bus->telegramReceived(), bus->telegramLen);
 }
 
@@ -592,7 +592,7 @@ TEST_CASE("Pause of an idle bus never waits for another IRQ", "[bus][pause]")
 {
     using namespace bustest;
     startBus();
-    unsigned waits = 0;
+    uint32_t waits = 0;
     sim::setInterruptBoundaryHook(
             [&](const sim::InterruptBoundary boundary)
             {
@@ -620,9 +620,9 @@ TEST_CASE("Pause waits with PRIMASK until a real timer IRQ makes the bus pausabl
     startBus();
     bus->resume(); // INIT cannot pause; the real timer callback changes it after the timeout.
     bool injected = false;
-    unsigned waits = 0;
-    unsigned handlersBeforeWait = 0;
-    const unsigned initialIrqs = sim::alarmIrqCount();
+    uint32_t waits = 0;
+    uint32_t handlersBeforeWait = 0;
+    const uint32_t initialIrqs = sim::alarmIrqCount();
     sim::setInterruptBoundaryHook(
             [&](const Boundary boundary)
             {
@@ -661,7 +661,7 @@ TEST_CASE("Pause wakes for future and unrelated IRQs and rechecks the real bus c
     const bool unrelatedIrq = GENERATE(false, true);
     startBus();
     bus->resume();
-    static unsigned unrelatedCalls = 0;
+    static uint32_t unrelatedCalls = 0;
     unrelatedCalls = 0;
     irq_set_exclusive_handler(TIMER1_IRQ_3, [] { ++unrelatedCalls; });
     irq_set_enabled(TIMER1_IRQ_3, true);
@@ -669,7 +669,7 @@ TEST_CASE("Pause wakes for future and unrelated IRQs and rechecks the real bus c
     {
         sim::atHardware(sim::now() + 10, [] { irq_set_pending(TIMER1_IRQ_3); });
     }
-    unsigned waits = 0;
+    uint32_t waits = 0;
     sim::setInterruptBoundaryHook(
             [&](const sim::InterruptBoundary boundary)
             {
@@ -681,8 +681,8 @@ TEST_CASE("Pause wakes for future and unrelated IRQs and rechecks the real bus c
                 }
             });
     bus->pause();
-    unsigned expectedWaits = 1;
-    unsigned expectedUnrelatedCalls = 0;
+    uint32_t expectedWaits = 1;
+    uint32_t expectedUnrelatedCalls = 0;
     if (unrelatedIrq)
     {
         expectedWaits = 2;
@@ -702,7 +702,7 @@ TEST_CASE("Pause with no enabled wake source is bounded by the simulator", "[bus
     {
         irq_set_enabled(num, false);
     }
-    unsigned waits = 0;
+    uint32_t waits = 0;
     sim::setInterruptBoundaryHook(
             [&](const sim::InterruptBoundary boundary)
             {
@@ -723,7 +723,7 @@ TEST_CASE("Pause preserves the enqueued telegram across pause and resume", "[bus
     using namespace bustest;
     startBus();
     send(groupWrite());
-    unsigned waits = 0;
+    uint32_t waits = 0;
     sim::setInterruptBoundaryHook(
             [&](const sim::InterruptBoundary boundary)
             {
@@ -747,7 +747,7 @@ TEST_CASE("Pause can wait for an enqueued telegram to finish", "[bus][pause]")
     using namespace bustest;
     startBus();
     send(groupWrite());
-    unsigned waits = 0;
+    uint32_t waits = 0;
     sim::setInterruptBoundaryHook(
             [&](const sim::InterruptBoundary boundary)
             {
@@ -769,7 +769,7 @@ TEST_CASE("Pause rechecks its condition when WFI returns without an IRQ", "[bus]
     startBus();
     bus->resume();
     sim::setWfiSpuriousReturns(2);
-    unsigned waits = 0;
+    uint32_t waits = 0;
     sim::setInterruptBoundaryHook(
             [&](const sim::InterruptBoundary boundary)
             {
@@ -787,7 +787,7 @@ TEST_CASE("Pause rechecks its condition when WFI returns without an IRQ", "[bus]
 TEST_CASE("Masked wait leaves a pending IRQ for the caller to dispatch", "[bus][pause]")
 {
     sim::reset();
-    static unsigned calls = 0;
+    static uint32_t calls = 0;
     calls = 0;
     irq_set_exclusive_handler(TIMER1_IRQ_3, [] { ++calls; });
     irq_set_enabled(TIMER1_IRQ_3, true);
@@ -818,7 +818,7 @@ namespace
 
     // White-box access is enabled only for this host-test translation unit. The original
     // bus state machine and timer emulation run unchanged; no WFI implementation is substituted.
-    constexpr unsigned WakeStateCount = Bus::SEND_WAIT_FOR_RX_ACK + 1;
+    constexpr uint32_t WakeStateCount = Bus::SEND_WAIT_FOR_RX_ACK + 1;
     constexpr uint32_t MaxBusWakeUs = 16000; // includes the 150-bit BUSY wait (15625 us)
 
     struct WakeCoverage
@@ -831,7 +831,7 @@ namespace
         void inspect()
         {
             const auto state = bus->state;
-            const unsigned index = static_cast<unsigned>(state);
+            const uint32_t index = static_cast<uint32_t>(state);
             REQUIRE(index < WakeStateCount);
             seen[index] = true;
             if (bus->canPause(true))
@@ -841,7 +841,7 @@ namespace
 
             const auto& st = timers[TIMER16_1];
             REQUIRE(st.alarmNum >= 0);
-            const unsigned alarm = static_cast<unsigned>(st.alarmNum);
+            const uint32_t alarm = static_cast<uint32_t>(st.alarmNum);
             const uint32_t mask = 1u << alarm;
             const uint32_t now = static_cast<uint32_t>(sim::now());
             const uint32_t delta = static_cast<uint32_t>(timer_hw->alarm[alarm]) - now;
@@ -893,8 +893,7 @@ namespace
 
 } // namespace
 
-TEST_CASE("bus wake: reachable non-pausable states have an enabled finite match alarm",
-          "[rp2350][bus][wake]")
+TEST_CASE("bus wake: reachable non-pausable states have an enabled finite match alarm", "[rp2350][bus][wake]")
 {
     WakeCoverage coverage;
 
@@ -919,32 +918,31 @@ TEST_CASE("bus wake: reachable non-pausable states have an enabled finite match 
     remoteSend(endOfStopBit(chars.back().startUs) + AckDelayUs, {SB_BUS_BUSY});
     coverage.run(90000); // BUSY backoff and later no-ACK repetitions
 
-    for (const auto state: {Bus::INIT, Bus::RECV_WAIT_FOR_STARTBIT_OR_TELEND, Bus::RECV_BITS_OF_BYTE,
-                            Bus::RECV_WAIT_FOR_ACK_TX_START, Bus::WAIT_50BT_FOR_NEXT_RX_OR_PENDING_TX_OR_IDLE,
-                            Bus::SEND_START_BIT, Bus::SEND_BIT_0, Bus::SEND_BITS_OF_BYTE, Bus::SEND_END_OF_TX,
-                            Bus::SEND_WAIT_FOR_RX_ACK_WINDOW, Bus::SEND_WAIT_FOR_RX_ACK})
+    for (const auto state:
+         {Bus::INIT, Bus::RECV_WAIT_FOR_STARTBIT_OR_TELEND, Bus::RECV_BITS_OF_BYTE, Bus::RECV_WAIT_FOR_ACK_TX_START,
+          Bus::WAIT_50BT_FOR_NEXT_RX_OR_PENDING_TX_OR_IDLE, Bus::SEND_START_BIT, Bus::SEND_BIT_0,
+          Bus::SEND_BITS_OF_BYTE, Bus::SEND_END_OF_TX, Bus::SEND_WAIT_FOR_RX_ACK_WINDOW, Bus::SEND_WAIT_FOR_RX_ACK})
     {
-        INFO("missing state " << static_cast<unsigned>(state));
-        CHECK(coverage.checked[static_cast<unsigned>(state)]);
+        INFO("missing state " << static_cast<uint32_t>(state));
+        CHECK(coverage.checked[static_cast<uint32_t>(state)]);
     }
     // These states are assigned and left by fallthrough/goto within one ISR. A Thread-mode
     // pause cannot observe them after the handler returned; do not manufacture them in a fixture.
     CHECK_FALSE(coverage.seen[Bus::INIT_RX_FOR_RECEIVING_NEW_TEL]);
     CHECK_FALSE(coverage.seen[Bus::SEND_END_OF_BYTE]);
     CHECK(coverage.maxDeadlineUs > 10000); // includes the actual BUSY wait, not just normal retries
-    std::printf("wake coverage: samples=%llu maxMatchAlarmDeltaUs=%u\n",
-                static_cast<unsigned long long>(coverage.samples), coverage.maxDeadlineUs);
+    std::printf("wake coverage: samples=%llu maxMatchAlarmDeltaUs=%u\n", static_cast<uint64_t>(coverage.samples),
+                coverage.maxDeadlineUs);
 }
 
-TEST_CASE("bus wake: match IRQ becomes pending with PRIMASK set in each observable wait state",
-          "[rp2350][bus][wake]")
+TEST_CASE("bus wake: match IRQ becomes pending with PRIMASK set in each observable wait state", "[rp2350][bus][wake]")
 {
-    for (const auto wanted: {Bus::INIT, Bus::RECV_WAIT_FOR_STARTBIT_OR_TELEND, Bus::RECV_BITS_OF_BYTE,
-                             Bus::RECV_WAIT_FOR_ACK_TX_START, Bus::WAIT_50BT_FOR_NEXT_RX_OR_PENDING_TX_OR_IDLE,
-                             Bus::SEND_START_BIT, Bus::SEND_BIT_0, Bus::SEND_BITS_OF_BYTE, Bus::SEND_END_OF_TX,
-                             Bus::SEND_WAIT_FOR_RX_ACK_WINDOW, Bus::SEND_WAIT_FOR_RX_ACK})
+    for (const auto wanted:
+         {Bus::INIT, Bus::RECV_WAIT_FOR_STARTBIT_OR_TELEND, Bus::RECV_BITS_OF_BYTE, Bus::RECV_WAIT_FOR_ACK_TX_START,
+          Bus::WAIT_50BT_FOR_NEXT_RX_OR_PENDING_TX_OR_IDLE, Bus::SEND_START_BIT, Bus::SEND_BIT_0,
+          Bus::SEND_BITS_OF_BYTE, Bus::SEND_END_OF_TX, Bus::SEND_WAIT_FOR_RX_ACK_WINDOW, Bus::SEND_WAIT_FOR_RX_ACK})
     {
-        DYNAMIC_SECTION("state " << static_cast<unsigned>(wanted))
+        DYNAMIC_SECTION("state " << static_cast<uint32_t>(wanted))
         {
             startBus();
             if (wanted == Bus::INIT)
@@ -968,9 +966,8 @@ TEST_CASE("bus wake: match IRQ becomes pending with PRIMASK set in each observab
             const auto telegram = bus->sendCurTelegram;
             const bool repeat = bus->repeatTelegram;
             const uint32_t saved = save_and_disable_interrupts();
-            const unsigned alarm = static_cast<unsigned>(timers[TIMER16_1].alarmNum);
-            const uint32_t delta = static_cast<uint32_t>(timer_hw->alarm[alarm]) -
-                                   static_cast<uint32_t>(sim::now());
+            const uint32_t alarm = static_cast<uint32_t>(timers[TIMER16_1].alarmNum);
+            const uint32_t delta = static_cast<uint32_t>(timer_hw->alarm[alarm]) - static_cast<uint32_t>(sim::now());
             REQUIRE(delta > 0);
             REQUIRE(delta <= MaxBusWakeUs);
             sim::advance(delta);
@@ -982,7 +979,7 @@ TEST_CASE("bus wake: match IRQ becomes pending with PRIMASK set in each observab
             CHECK(bus->repeatTelegram == repeat);
 
             // Reading time/capture/match cannot drain PIO/DMA or execute a delayed bus state transition.
-            for (unsigned i = 0; i < 64; ++i)
+            for (uint32_t i = 0; i < 64; ++i)
             {
                 (void)bus->timer.value();
                 (void)bus->timer.capture(bus->captureChannel);
@@ -998,8 +995,7 @@ TEST_CASE("bus wake: match IRQ becomes pending with PRIMASK set in each observab
     }
 }
 
-TEST_CASE("bus wake: thread entry points change fields and arm the next interrupt",
-          "[rp2350][bus][wake]")
+TEST_CASE("bus wake: thread entry points change fields and arm the next interrupt", "[rp2350][bus][wake]")
 {
     startBus();
     REQUIRE(bus->state == Bus::IDLE);

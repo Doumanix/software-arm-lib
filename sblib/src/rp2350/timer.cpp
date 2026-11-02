@@ -100,10 +100,10 @@ namespace
     constexpr int PwmStartChannel = TIMER_MATCH_MAT0; // bus PWM: pulse start (TX HIGH)
     constexpr int PwmEndChannel = TIMER_MATCH_MAT2;   // bus PWM: pulse end (TX LOW)
     constexpr int MatchActions = INTERRUPT | RESET | STOP | CLEAR | SET | TOGGLE;
-    constexpr unsigned int PulseEndBusyWaitUs = 4; // bus PWM: wait in the interrupt for a pulse end this close
+    constexpr uint32_t PulseEndBusyWaitUs = 4; // bus PWM: wait in the interrupt for a pulse end this close
     // Bus PWM: the alarm of a TX edge fires this much earlier, the interrupt waits for the exact edge
     // time and switches TX. Covers interrupt entry and short phases with disabled interrupts.
-    constexpr unsigned int PwmEdgeLeadUs = 4;
+    constexpr uint32_t PwmEdgeLeadUs = 4;
     // Hardware priority of the alarm and capture interrupts of the bus timer: one of the 16 levels
     // below its TX edge interrupt (which has the priority set with setIRQPriority())
     constexpr uint8_t BelowTxEdgePriority = 0x10;
@@ -124,14 +124,14 @@ namespace
         int alarmNum = -1;
         InterruptPriority priority = InterruptPriority::medium;
 
-        unsigned int prescaler = 0;
-        uint32_t startUs = 0;          // system time at timer value 0
-        unsigned int stoppedValue = 0; // timer value while stopped
-        uint32_t stoppedCycle = 0;     // counter cycle (16 bit wraps) when stopped
-        bool holdActive = false;       // after a RESET: the microsecond before startUs reads holdValue
-        unsigned int holdValue = 0;    // match value of the RESET (the LPC11xx holds it for one tick)
+        uint32_t prescaler = 0;
+        uint32_t startUs = 0;      // system time at timer value 0
+        uint32_t stoppedValue = 0; // timer value while stopped
+        uint32_t stoppedCycle = 0; // counter cycle (16 bit wraps) when stopped
+        bool holdActive = false;   // after a RESET: the microsecond before startUs reads holdValue
+        uint32_t holdValue = 0;    // match value of the RESET (the LPC11xx holds it for one tick)
 
-        unsigned int matchValue[MatchChannels] = {0xffff, 0xffff, 0xffff, 0xffff};
+        uint32_t matchValue[MatchChannels] = {0xffff, 0xffff, 0xffff, 0xffff};
         int matchModeValue[MatchChannels] = {};
         uint32_t deadlineUs[MatchChannels] = {};
         DeadlineState deadlineState[MatchChannels] = {};
@@ -141,10 +141,10 @@ namespace
         bool matchLevel[MatchChannels] = {};
         bool pulseEndPending = false; // bus PWM: pulse ends at the counter reset after the MAT2 event
         uint32_t pulseEndUs = 0;
-        uint32_t pulseStartUs = 0;     // bus PWM: actual start of the pulse (TX HIGH)
-        unsigned int pulseWidthUs = 0; // bus PWM: nominal width MAT2 + 1 - MAT0
+        uint32_t pulseStartUs = 0; // bus PWM: actual start of the pulse (TX HIGH)
+        uint32_t pulseWidthUs = 0; // bus PWM: nominal width MAT2 + 1 - MAT0
 
-        unsigned int captureValue[CaptureChannels] = {};
+        uint32_t captureValue[CaptureChannels] = {};
         int captureModeValue[CaptureChannels] = {};
 #if defined(SBLIB_RP2350_TIMER_STATS)
         uint32_t lastCaptureUs = 0; // system time of the previous capture edge (diagnostics only)
@@ -330,12 +330,12 @@ namespace
         return elapsed & timerMask(timerNum);
     }
 
-    inline unsigned int currentValue(const uint8_t timerNum, const uint32_t now)
+    inline uint32_t currentValue(const uint8_t timerNum, const uint32_t now)
     {
         const int64_t pos = counterPos(timerNum, now);
         if (pos >= 0)
         {
-            return static_cast<unsigned int>(pos);
+            return static_cast<uint32_t>(pos);
         }
         return timers[timerNum].holdValue;
     }
@@ -347,7 +347,7 @@ namespace
     }
 
     // Timer value at the time atUs (not before startUs)
-    inline unsigned int valueAt(const uint8_t timerNum, const uint32_t atUs)
+    inline uint32_t valueAt(const uint8_t timerNum, const uint32_t atUs)
     {
         return (atUs - timers[timerNum].startUs) & timerMask(timerNum);
     }
@@ -440,31 +440,31 @@ namespace
         return matchArmed(timerNum, ch, now) && pos >= static_cast<int64_t>(st.matchValue[ch]);
     }
 
-    unsigned int TIMER_RAM_FUNC(matchDelay)(const uint8_t timerNum, const int ch, const int64_t pos, const uint32_t now)
+    uint32_t TIMER_RAM_FUNC(matchDelay)(const uint8_t timerNum, const int ch, const int64_t pos, const uint32_t now)
     {
         const TimerState& st = timers[timerNum];
         if (st.deadlineState[ch] == DeadlineState::Pending)
         {
             const int32_t remaining = static_cast<int32_t>(st.deadlineUs[ch] - now);
-            unsigned int delay = 1u;
+            uint32_t delay = 1u;
             if (remaining > 0)
             {
-                delay = static_cast<unsigned int>(remaining);
+                delay = static_cast<uint32_t>(remaining);
             }
             return delay;
         }
         const int64_t mv = st.matchValue[ch];
         if (matchArmed(timerNum, ch, now))
         {
-            unsigned int delay = 1u;
+            uint32_t delay = 1u;
             if (mv > pos)
             {
-                delay = static_cast<unsigned int>(mv - pos);
+                delay = static_cast<uint32_t>(mv - pos);
             }
             return delay;
         }
         // Fired in this cycle (16 bit): next match when the counter reaches the value after the wrap
-        return static_cast<unsigned int>(static_cast<int64_t>(timerMask(timerNum)) + 1 - pos + mv);
+        return static_cast<uint32_t>(static_cast<int64_t>(timerMask(timerNum)) + 1 - pos + mv);
     }
 
     void TIMER_RAM_FUNC(driveTx)(const bool pulse)
@@ -946,7 +946,7 @@ namespace
         {
             return false;
         }
-        unsigned int endOffset = 1u;
+        uint32_t endOffset = 1u;
         if (!(st.matchModeValue[PwmEndChannel] & RESET))
         {
             endOffset = 0u;
@@ -1180,7 +1180,7 @@ namespace
         cancelAlarm(st.alarmNum);
 
         const uint32_t now = nowUs();
-        unsigned int bestDelta = 0;
+        uint32_t bestDelta = 0;
         bool found = false;
 
         if (hasBusPins(timerNum) && txEdge.alarmNum >= 0 && planTxEdge(timerNum, now))
@@ -1212,7 +1212,7 @@ namespace
                     continue;
                 }
 
-                const unsigned int delta = matchDelay(timerNum, ch, pos, now);
+                const uint32_t delta = matchDelay(timerNum, ch, pos, now);
                 if (!found || delta < bestDelta)
                 {
                     found = true;
@@ -1372,7 +1372,7 @@ namespace
 
             bool hadReset = false;
             uint32_t resetEventUs = 0;
-            unsigned int resetHoldValue = 0;
+            uint32_t resetHoldValue = 0;
             bool firedPulseEnd = false;
             uint32_t pulseEndUs = 0;
 
@@ -1420,12 +1420,12 @@ namespace
             const bool pulseEndWithReset = (st.matchModeValue[PwmEndChannel] & RESET) != 0;
 
             // Nominal pulse width: MAT2 + 1 - MAT0 with RESET (the pulse ends with the cycle reset)
-            unsigned int endOffset = 1u;
+            uint32_t endOffset = 1u;
             if (!pulseEndWithReset)
             {
                 endOffset = 0u;
             }
-            unsigned int pulseWidth = 1;
+            uint32_t pulseWidth = 1;
             if (st.matchValue[PwmEndChannel] + endOffset > st.matchValue[PwmStartChannel])
             {
                 pulseWidth = st.matchValue[PwmEndChannel] + endOffset - st.matchValue[PwmStartChannel];
@@ -1765,7 +1765,7 @@ namespace
      * Timer value at the time of a past edge, as the LPC11xx capture register latched it: also if the counter
      * started a new cycle (RESET, value(), restart()) between the edge and now.
      */
-    unsigned int TIMER_RAM_FUNC(captureValueAt)(const uint8_t timerNum, const uint32_t edgeUs)
+    uint32_t TIMER_RAM_FUNC(captureValueAt)(const uint8_t timerNum, const uint32_t edgeUs)
     {
         const TimerState& st = timers[timerNum];
         const uint32_t beforeChangeUs = st.cycleChangeUs - edgeUs;
@@ -1983,8 +1983,7 @@ namespace
 
 Timer::Timer(const uint8_t aTimerNum) :
     timerNum(aTimerNum)
-{
-}
+{}
 
 void Timer::begin() const
 {

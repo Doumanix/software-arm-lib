@@ -115,8 +115,15 @@ The diagnostic counters of `Bus::pause()` are available with `SBLIB_RP2350_TIMER
 otherwise a cache miss changes the pulse timing. The sblib timer emulation uses
 `__not_in_flash_func` (macro `TIMER_RAM_FUNC` in `src/rp2350/timer.cpp`) and takes its alarm
 interrupts directly from the vector table in RAM. Application interrupt handlers that are
-time critical should be placed the same way. `Bus::pause()` and the other bus code in `bus.cpp`
-run from flash; this is covered by the host tests with slow interrupt handlers.
+time critical should be placed the same way. The whole bus interrupt path (`alarmIrq`, `pioRxIrq`,
+`rxEdgeHandler`, `txEdgeIrq` and everything they call: bus state machine in `bus.cpp`, timer
+emulation, `millis()`, the bus callbacks of the BCU, user RAM/EEPROM, memory and address table
+access, the error path) is placed in RAM by the linker script `sblib/linker/rp2350/memmap_default.ld`,
+which `cmake/rp2350/pico_sdk_setup.cmake` selects through `PICO_LINKER_SCRIPT_PATH` unless the
+application sets it. The script is the SDK memory map with additional object files in the
+`EXCLUDE_FILE` lists of `.text` and `.rodata`; their code and constants are copied to RAM by crt0.
+Code outside this path (for example `Bus::pause()` callers in the application) still runs from
+flash. Host tests with slow interrupt handlers cover the timing.
 
 **Pin function of the TX pin.** With `SBLIB_RP2350_PIO_BUS` the `OUTPUT_MATCH` pin mode of
 `PIN_EIB_TX` selects the PIO function; with the GPIO bus it is a plain output. Do not configure

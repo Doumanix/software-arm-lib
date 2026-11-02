@@ -26,10 +26,10 @@ sim_pio_hw_t sim_pio0_hw = {};
 namespace
 {
 
-    constexpr unsigned AlarmCount = NUM_GENERIC_TIMERS * NUM_ALARMS;
-    constexpr unsigned GpioCount = NUM_BANK0_GPIOS;
-    constexpr unsigned MaxStepsWithoutTime = 100000; // more = interrupt storm
-    constexpr unsigned BusyWaitReads = 16;           // time reads without progress until +1 us
+    constexpr uint32_t AlarmCount = NUM_GENERIC_TIMERS * NUM_ALARMS;
+    constexpr uint32_t GpioCount = NUM_BANK0_GPIOS;
+    constexpr uint32_t MaxStepsWithoutTime = 100000; // more = interrupt storm
+    constexpr uint32_t BusyWaitReads = 16;           // time reads without progress until +1 us
 
     struct Alarm
     {
@@ -50,7 +50,7 @@ namespace
         TxEdge  // timer.cpp TX program: X counts microseconds, the pin toggles when X reaches ISR
     };
 
-    constexpr unsigned FifoDepth = 4;
+    constexpr uint32_t FifoDepth = 4;
 
     struct PioSm
     {
@@ -68,7 +68,7 @@ namespace
         uint32_t osr = 0;
         uint64_t enabledAtUs = 0;
         uint64_t lastCommandUs = 0; // time the last pair of the TX FIFO became the edge times
-        unsigned pendingPairs = 0;  // pairs in the TX FIFO with a scheduled take over
+        uint32_t pendingPairs = 0;  // pairs in the TX FIFO with a scheduled take over
         uint64_t edgeToken = 0;     // changes with the edge time (a scheduled edge of an old one is void)
         uint64_t commandToken = 0;  // changes when the FIFO is cleared or the state machine stops
     };
@@ -98,17 +98,17 @@ namespace
         uint64_t nowUs = 0;
         uint32_t alarmLatencyUs = 0;
         bool globalEnabled = true;
-        unsigned wfiSpuriousReturns = 0;
+        uint32_t wfiSpuriousReturns = 0;
         std::function<void(sim::InterruptBoundary)> interruptBoundaryHook;
         std::vector<uint> running; // IRQ numbers of the running handlers, innermost last
-        unsigned alarmCallbacks = 0;
+        uint32_t alarmCallbacks = 0;
         Alarm alarms[AlarmCount];
         bool irqEnabled[IRQ_COUNT] = {};
         bool nvicPending[IRQ_COUNT] = {}; // stays set when the source is cleared before the handler runs
         uint8_t irqPrio[IRQ_COUNT] = {};
         irq_handler_t vector[IRQ_COUNT] = {};
         sim::PinConfig config[GpioCount];
-        unsigned gpioCalls = 0;
+        uint32_t gpioCalls = 0;
         bool level[GpioCount] = {};
         std::vector<sim::PinEvent> log[GpioCount];
         uint32_t latched[GpioCount] = {};
@@ -117,9 +117,9 @@ namespace
         std::vector<std::pair<uint, std::function<void(bool)>>> pinObservers;
 
         bool busyWaitAdvance = false;
-        unsigned readsWithoutProgress = 0;
+        uint32_t readsWithoutProgress = 0;
         bool processingEvents = false;
-        unsigned processingIsrLevel = 0; // insideIsr when the busy wait processing started
+        uint32_t processingIsrLevel = 0; // insideIsr when the busy wait processing started
 
         std::vector<Event> events;
         uint64_t eventSeq = 0;
@@ -165,7 +165,7 @@ namespace
 
     bool gpioIrqAsserted()
     {
-        for (unsigned g = 0; g < GpioCount; ++g)
+        for (uint32_t g = 0; g < GpioCount; ++g)
         {
             if (s.latched[g] & s.enabledEvents[g])
             {
@@ -175,9 +175,9 @@ namespace
         return false;
     }
 
-    unsigned insideIsr()
+    uint32_t insideIsr()
     {
-        return static_cast<unsigned>(s.running.size());
+        return static_cast<uint32_t>(s.running.size());
     }
 
     // Interrupt source active and enabled in the NVIC
@@ -199,7 +199,7 @@ namespace
         if (num == DMA_IRQ_0)
         {
             uint32_t enabledMask = 0;
-            for (unsigned ch = 0; ch < NUM_DMA_CHANNELS; ++ch)
+            for (uint32_t ch = 0; ch < NUM_DMA_CHANNELS; ++ch)
             {
                 if (s.dma[ch].irq0Enabled)
                 {
@@ -248,7 +248,7 @@ namespace
     void deliverPending()
     {
         uint64_t lastTime = s.nowUs;
-        unsigned steps = 0;
+        uint32_t steps = 0;
         for (;;)
         {
             int next = -1;
@@ -292,7 +292,7 @@ namespace
     int nextEvent(const uint64_t endUs, const bool hardwareOnly)
     {
         int best = -1;
-        for (unsigned i = 0; i < s.events.size(); ++i)
+        for (uint32_t i = 0; i < s.events.size(); ++i)
         {
             const Event& e = s.events[i];
             if (e.timeUs > endUs || (hardwareOnly && !e.hardware))
@@ -311,7 +311,7 @@ namespace
     int nextAlarm(const uint64_t endUs)
     {
         int next = -1;
-        for (unsigned a = 0; a < AlarmCount; ++a)
+        for (uint32_t a = 0; a < AlarmCount; ++a)
         {
             const Alarm& al = s.alarms[a];
             if (al.armed && al.target <= endUs && (next < 0 || al.target < s.alarms[next].target))
@@ -329,7 +329,7 @@ namespace
     void processUntil(const uint64_t endUs, const bool hardwareOnly)
     {
         uint64_t lastTime = s.nowUs;
-        unsigned steps = 0;
+        uint32_t steps = 0;
         for (;;)
         {
             deliverPending();
@@ -385,7 +385,7 @@ namespace
         if (s.busyWaitAdvance && mayProcess && ++s.readsWithoutProgress >= BusyWaitReads)
         {
             const bool outerProcessing = s.processingEvents;
-            const unsigned outerIsrLevel = s.processingIsrLevel;
+            const uint32_t outerIsrLevel = s.processingIsrLevel;
             s.processingEvents = true;
             s.processingIsrLevel = insideIsr();
             const uint64_t target = s.nowUs + 1;
@@ -697,13 +697,13 @@ uint64_t time_us_64()
 namespace
 {
 
-    uint32_t alarmMask(const unsigned a)
+    uint32_t alarmMask(const uint32_t a)
     {
         return 1u << a;
     }
 
     // ALARMx written: arm the alarm, it fires when TIMERAWL reaches the value (32 bit wrap)
-    void writeAlarm(const unsigned a, const uint32_t value)
+    void writeAlarm(const uint32_t a, const uint32_t value)
     {
         Alarm& al = s.alarms[a];
         uint64_t delta = static_cast<uint32_t>(value - static_cast<uint32_t>(s.nowUs));
@@ -718,7 +718,7 @@ namespace
     uint32_t readAlarmBits(bool Alarm::* bit)
     {
         uint32_t value = 0;
-        for (unsigned a = 0; a < AlarmCount; ++a)
+        for (uint32_t a = 0; a < AlarmCount; ++a)
         {
             if (s.alarms[a].*bit)
             {
@@ -730,7 +730,7 @@ namespace
 
     void writeAlarmBits(bool Alarm::* bit, const uint32_t value)
     {
-        for (unsigned a = 0; a < AlarmCount; ++a)
+        for (uint32_t a = 0; a < AlarmCount; ++a)
         {
             s.alarms[a].*bit = (value & alarmMask(a)) != 0;
         }
@@ -739,7 +739,7 @@ namespace
     // Write 1 clears
     void clearAlarmBits(bool Alarm::* bit, const uint32_t mask)
     {
-        for (unsigned a = 0; a < AlarmCount; ++a)
+        for (uint32_t a = 0; a < AlarmCount; ++a)
         {
             if (mask & alarmMask(a))
             {
@@ -793,7 +793,7 @@ sim_timer_reg_t::operator uint32_t() const
         case Ints:
         {
             uint32_t value = 0;
-            for (unsigned a = 0; a < AlarmCount; ++a)
+            for (uint32_t a = 0; a < AlarmCount; ++a)
             {
                 const ::Alarm& al = s.alarms[a];
                 if ((al.irqRaw && al.enabled) || al.forced)
@@ -819,7 +819,7 @@ void hw_clear_bits(sim_timer_reg_t* reg, const uint32_t mask)
 
 int hardware_alarm_claim_unused(const bool required)
 {
-    for (unsigned a = 0; a < AlarmCount; ++a)
+    for (uint32_t a = 0; a < AlarmCount; ++a)
     {
         if (!s.alarms[a].claimed)
         {
@@ -869,9 +869,9 @@ namespace
         return s.sms[sm];
     }
 
-    bool programAt(const uint pc, const uint16_t* words, const unsigned count)
+    bool programAt(const uint pc, const uint16_t* words, const uint32_t count)
     {
-        for (unsigned i = 0; i < count; ++i)
+        for (uint32_t i = 0; i < count; ++i)
         {
             if (pc + i >= PIO_INSTRUCTION_COUNT || s.pioMemory[pc + i] != words[i])
             {
@@ -965,9 +965,9 @@ namespace
 
     constexpr uint16_t TxEdgeLoopWord = 0xa046;   // mov y, isr
     constexpr uint16_t TxEdgeToggleWord = 0xa008; // mov pins, ~pins
-    constexpr unsigned TxEdgeLength = 17;
-    constexpr unsigned TxEdgeStart = 4;
-    constexpr unsigned TxEdgeWrap = 12;
+    constexpr uint32_t TxEdgeLength = 17;
+    constexpr uint32_t TxEdgeStart = 4;
+    constexpr uint32_t TxEdgeWrap = 12;
     constexpr uint32_t MaxEdgeWaitUs = 60000000; // more: an edge time X passed already (wait for the wrap)
 
     uint32_t txX(const PioSm& st, const uint64_t atUs)
@@ -1128,7 +1128,7 @@ int pio_add_program(const PIO pio, const pio_program_t* program)
         {
             continue;
         }
-        for (unsigned i = 0; i < program->length; ++i)
+        for (uint32_t i = 0; i < program->length; ++i)
         {
             uint16_t instr = program->instructions[i];
             if ((instr & 0xe000u) == 0) // JMP: relocated like by the SDK
@@ -1507,7 +1507,7 @@ void dma_channel_acknowledge_irq0(const uint channel)
 namespace sim
 {
 
-    void setWfiSpuriousReturns(const unsigned count)
+    void setWfiSpuriousReturns(const uint32_t count)
     {
         s.wfiSpuriousReturns = count;
     }
@@ -1570,7 +1570,7 @@ namespace sim
         return s.level[gpio];
     }
 
-    unsigned alarmIrqCount()
+    uint32_t alarmIrqCount()
     {
         return s.alarmCallbacks;
     }
@@ -1659,10 +1659,10 @@ namespace sim
         return s.sms[sm].enabled;
     }
 
-    unsigned pioProgramWordsUsed()
+    uint32_t pioProgramWordsUsed()
     {
-        unsigned count = 0;
-        for (unsigned i = 0; i < PIO_INSTRUCTION_COUNT; ++i)
+        uint32_t count = 0;
+        for (uint32_t i = 0; i < PIO_INSTRUCTION_COUNT; ++i)
         {
             if (s.pioMemoryUsed & (1u << i))
             {
@@ -1733,7 +1733,7 @@ namespace sim
     {
         return s.enabledEvents[gpio];
     }
-    unsigned gpioCalls()
+    uint32_t gpioCalls()
     {
         return s.gpioCalls;
     }

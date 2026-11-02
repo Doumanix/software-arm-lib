@@ -17,14 +17,15 @@
  * published by the Free Software Foundation.
  */
 
-#include <cstdio>
-#include "pico/stdlib.h"
+#include "sblib/digital_pin.h"
+#include "sblib/eibBCU1.h"
+#include "sblib/io_pin_names.h"
+#include "sblib/timeout.h"
+#include "sblib/timer.h"
 
-#include <sblib/eibBCU1.h>
-#include <sblib/digital_pin.h>
-#include <sblib/io_pin_names.h>
-#include <sblib/timeout.h>
-#include <sblib/timer.h>
+#include <cstdio>
+
+#include "pico/stdlib.h"
 
 constexpr int Manufacturer = 0x04; // Jung
 constexpr int DeviceType = 0x2060; // 2138.10, as out8-bcu1

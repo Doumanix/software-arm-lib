@@ -22,4 +22,6 @@ materials provided with the distribution. Copyright notice of the Pico SDK:
 
 The sblib itself is licensed under the GNU General Public License version 3 (see `LICENSE`).
 
+`sblib/linker/rp2350/memmap_default.ld` is a copy of `src/rp2_common/pico_crt0/rp2350/memmap_default.ld` of SDK 2.2.0 (Copyright (c) 2020 Raspberry Pi (Trading) Ltd., BSD-3-Clause). The only change is that the object files of the bus interrupt path are excluded from the flash sections and placed in RAM.
+
 `cmake/rp2350/pico_sdk_import.cmake` is derived from SDK 2.2.0 and retains its BSD-3-Clause notice. Local changes pin the fetch to 2.2.0, disable SDK submodules, check the exact SDK version and support headers-only host tests.

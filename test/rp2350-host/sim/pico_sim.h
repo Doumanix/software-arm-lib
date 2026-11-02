@@ -12,10 +12,10 @@
  *  them (32 bit single transfers, DREQ of a PIO RX FIFO or unpaced, chaining, IRQ 0). The RX state
  *  machine pushes one word per falling edge of its input pin. The TX state machine counts X down once per
  *  microsecond while enabled. Its TX FIFO takes pairs of edge times (ISR, OSR); a pair written in the
- *  microsecond w is compared from w + 2 on (worst case of the real program), at most one pair per microsecond. When X reaches
- *  ISR, the pin toggles, X is pushed as confirmation and OSR becomes the next edge time. An edge time that X
- *  already passed would wait for the 32 bit wrap of X (71 minutes): the simulation throws. A GPIO with a PIO
- *  function (pio_gpio_init, gpio_set_function) is driven by the state machine only, gpio_put() then changes
+ *  microsecond w is compared from w + 2 on (worst case of the real program), at most one pair per microsecond.
+ *  When X reaches ISR, the pin toggles, X is pushed as confirmation and OSR becomes the next edge time. An edge
+ *  time that X already passed would wait for the 32 bit wrap of X (71 minutes): the simulation throws. A GPIO with
+ *  a PIO function (pio_gpio_init, gpio_set_function) is driven by the state machine only, gpio_put() then changes
  *  just the SIO output latch.
  *
  *  Interrupt model as the NVIC of the Cortex-M33: an interrupt runs if interrupts are enabled
@@ -330,11 +330,11 @@ namespace sim
         bool pullUp = false;
         bool pullDown = false;
         bool inputEnabled = false;
-        unsigned calls = 0;
+        uint32_t calls = 0;
     };
     const PinConfig& pinConfig(uint gpio);
     uint32_t pinIrqEvents(uint gpio);
-    unsigned gpioCalls();
+    uint32_t gpioCalls();
 
     // Test boundaries in the real Bus::pause() calls, not a replacement pause loop.
     enum class InterruptBoundary : uint8_t
@@ -346,7 +346,7 @@ namespace sim
     };
     void setInterruptBoundaryHook(std::function<void(InterruptBoundary)> hook);
     // WFI is a hint: exercise a finite number of returns without any pending interrupt.
-    void setWfiSpuriousReturns(unsigned count);
+    void setWfiSpuriousReturns(uint32_t count);
 
     struct PinEvent
     {
@@ -370,7 +370,7 @@ namespace sim
     const std::vector<PinEvent>& pinLog(uint gpio);
     bool pinLevel(uint gpio);
     // Number of alarm interrupt handler calls since reset()
-    unsigned alarmIrqCount();
+    uint32_t alarmIrqCount();
     // Alarm armed (ARMED)
     bool alarmArmed(uint alarm_num);
     // Interrupts globally enabled (not inside save_and_disable_interrupts...)
@@ -412,7 +412,7 @@ namespace sim
     // PIO0 and DMA (SBLIB_RP2350_PIO_BUS)
     bool pioSmClaimed(uint sm);
     bool pioSmEnabled(uint sm);
-    unsigned pioProgramWordsUsed();
+    uint32_t pioProgramWordsUsed();
     bool dmaChannelClaimed(uint channel);
     // System clock returned by clock_get_hz(clk_sys)
     void setSysClockHz(uint32_t hz);
