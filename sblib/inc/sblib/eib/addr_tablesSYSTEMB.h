@@ -2,6 +2,7 @@
  *  addr_tables.h - BCU communication address tables.
  *
  *  Copyright (c) 2014 Stefan Taferner <stefan.taferner@gmx.at>
+ *  Copyright (c) 2026 Doumanix <doumanix@gmx.de>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 3 as
@@ -30,6 +31,14 @@ public:
      * only scans the group addresses.
      */
     int indexOfAddr(int addr) override;
+
+    /**
+     * Get total number of address entries
+     * @return The 16 bit count from the first two bytes of the table
+     *
+     * @brief SYSTEMB uses a 16 bit count; see ComObjects::firstObjectAddr().
+     */
+    uint16_t addrCount() override;
 
 private:
     SYSTEMB* bcu;
