@@ -53,7 +53,7 @@ public:
         OPEN_WAIT
     };
 
-    explicit TLayer4(uint8_t maxTelegramLength);
+    explicit TLayer4(TelegramLength maxTelegramLength);
     TLayer4() = delete;
     virtual ~TLayer4() = default;
 
