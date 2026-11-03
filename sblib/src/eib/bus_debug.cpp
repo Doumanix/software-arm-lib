@@ -36,7 +36,11 @@
          }
 
 #ifdef DUMP_TELEGRAMS
+#   if SBLIB_MAX_APDU_LENGTH > 15
+    volatile unsigned char telBuffer[TelegramBufferSize];
+#   else
     volatile unsigned char telBuffer[32];
+#   endif
     volatile unsigned int telLength = 0;
     volatile unsigned char txtelBuffer[32];
     volatile unsigned int txtelLength = 0;
@@ -247,9 +251,15 @@ void dumpFrameTiming(int delta)
     {
         serial.print(" fre"); // frame early
         serial.print(" ", delta);
+#   if SBLIB_MAX_APDU_LENGTH > 15
+        if (telLength >= 4u)
+        {
+            const uint16_t senderAddr = lpduSenderAddress(const_cast<unsigned char*>(telBuffer));
+#   else
         if (telLength >= 3)
         {
             const uint16_t senderAddr = makeWord(telBuffer[1], telBuffer[2]);
+#   endif
             serial.print(" (");
             dumpKNXAddress(senderAddr);
             serial.print(")");
