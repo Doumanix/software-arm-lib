@@ -163,12 +163,12 @@ LoadState PropertiesMASK0701::handleAllocAbsTaskSegment(const int objectIdx, con
     switch (objectIdx)
     {
         case OT_ADDR_TABLE:
-            bcu->userEeprom->addrTabAddr() = addr;
+            bcu->userEeprom->setAddrTabAddr(addr);
             DB_PROPERTIES(serial.println("  ----> userEeprom->addrTabAddr=0x", bcu->userEeprom->addrTabAddr(), HEX, 4); serial.println(););
             break;
 
         case OT_ASSOC_TABLE:
-            bcu->userEeprom->assocTabAddr() = addr;
+            bcu->userEeprom->setAssocTabAddr(addr);
             DB_PROPERTIES(serial.println("  ----> userEeprom->assocTabAddr=0x", bcu->userEeprom->assocTabAddr(), HEX, 4); serial.println(););
             break;
 
@@ -177,7 +177,7 @@ LoadState PropertiesMASK0701::handleAllocAbsTaskSegment(const int objectIdx, con
             if (bcu->getCommObjectTableAddressStatic() == 0)
             {
                 // Set commsTabAddr if no read-only address is provided
-                bcu->userEeprom->commsTabAddr() = addr;
+                bcu->userEeprom->setCommsTabAddr(addr);
                 DB_PROPERTIES(serial.println("  ----> userEeprom->commsTabAddr = 0x", bcu->userEeprom->commsTabAddr(), HEX, 4););
             }
             else
@@ -189,12 +189,12 @@ LoadState PropertiesMASK0701::handleAllocAbsTaskSegment(const int objectIdx, con
                 );
             }
 
-            bcu->userEeprom->appPeiType() = payLoad[2];
-            bcu->userEeprom->manufacturerH() = payLoad[3];
-            bcu->userEeprom->manufacturerL() = payLoad[4];
-            bcu->userEeprom->deviceTypeH() = payLoad[5];
-            bcu->userEeprom->deviceTypeL() = payLoad[6];
-            bcu->userEeprom->version() = payLoad[7];
+            bcu->userEeprom->setAppPeiType(payLoad[2]);
+            bcu->userEeprom->setManufacturerH(payLoad[3]);
+            bcu->userEeprom->setManufacturerL(payLoad[4]);
+            bcu->userEeprom->setDeviceTypeH(payLoad[5]);
+            bcu->userEeprom->setDeviceTypeL(payLoad[6]);
+            bcu->userEeprom->setVersion(payLoad[7]);
             DB_PROPERTIES(
                 serial.println("  ----> userEeprom->appPeiType = 0x", bcu->userEeprom->appPeiType(), HEX, 2);
                 serial.println("  ----> userEeprom->manufacturerH & L = 0x", makeWord(bcu->userEeprom->manufacturerH(), bcu->userEeprom->manufacturerL()), HEX, 4);
