@@ -19,7 +19,7 @@
 void BCU2::setOwnAddress(const uint16_t addr)
 {
     BcuDefault::setOwnAddress(addr);
-    if (userEeprom->loadState()[OT_ADDR_TABLE] == LS_LOADING)
+    if (ownAddressInAddrTable() && (userEeprom->loadState()[OT_ADDR_TABLE] == LS_LOADING))
     {
         uint8_t* addrTab = addrTables->addrTable() + 1;
         *(addrTab + 0) = HIGH_BYTE(ownAddress());
@@ -35,7 +35,7 @@ inline void BCU2::begin(const int manufacturer, const int deviceType, const int 
     userRam->peiType() = 0;    // PEI type: 0=no adapter connected to PEI.
     userEeprom->appType() = 0; // Set to BCU2 application. ETS reads this when programming.
 
-    if (userEeprom->loadState()[OT_ADDR_TABLE] == LS_LOADING)
+    if (ownAddressInAddrTable() && (userEeprom->loadState()[OT_ADDR_TABLE] == LS_LOADING))
     {
         const uint8_t* addrTab = addrTables->addrTable() + 1;
         setOwnAddress(makeWord(*(addrTab), *(addrTab + 1)));

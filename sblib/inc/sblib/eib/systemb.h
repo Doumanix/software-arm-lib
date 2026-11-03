@@ -34,6 +34,10 @@ public:
             PropertiesSYSTEMB* properties);
 
     uint16_t getMaskVersion() const override { return 0x7B0; }
+
+protected:
+    /** The SYSTEMB address table holds only group addresses, see AddrTablesSYSTEMB. */
+    bool ownAddressInAddrTable() const override { return false; }
 };
 
 #endif /* SBLIB_KNX_SYSTEMB_H_ */

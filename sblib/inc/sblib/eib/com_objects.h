@@ -316,7 +316,7 @@ protected:
     /**
      * @return The number of communication objects.
      */
-    int objectCount();
+    virtual int objectCount();
 
     /**
      * Find the first group address for the communication object. This is the
@@ -325,7 +325,7 @@ protected:
      * @param objno - the ID of the communication object
      * @return The group address, or 0 if none found.
      */
-    int firstObjectAddr(int objno) const;
+    virtual int firstObjectAddr(int objno) const;
 
     /**
      * Create and send a group read request telegram.

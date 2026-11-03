@@ -57,6 +57,9 @@ protected:
         UserEeprom(start, size, flashSize) {}
 
 private:
+    ///\todo remove this friend declaration together with the one in UserEepromBCU2
+    friend class PropertiesSYSTEMB;
+
     static constexpr uint32_t optionRegOffset = 0x00;         //!< 0x0100: EEPROM option register
     static constexpr uint32_t manuDataHOffset = 0x01;         //!< 0x0101: Manufacturing data high byte
     static constexpr uint32_t manuDataLOffset = 0x02;         //!< 0x0102: Manufacturing data low byte

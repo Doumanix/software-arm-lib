@@ -26,6 +26,8 @@ protected:
         UserEepromMASK0701(start, size, flashSize) {}
 
 private:
+    friend class PropertiesSYSTEMB;
+
     static constexpr uint32_t addrTabAddrOffset = 0x21;  //!< 0x3321-0x3322
     static constexpr uint32_t assocTabAddrOffset = 0x23; //!< 0x3323-0x3324
 
@@ -36,6 +38,7 @@ private:
     static constexpr uint32_t commsSeg0McbOffset = 0x6D; //!< 0x336D-0x3374
     static constexpr uint32_t eibObjVerOffset = 0x75;    //!< 0x3375-0x3379 Application program 1 version
     static constexpr uint32_t commsSeg0VerOffset = 0x7A; //!< 0x337A-0x337E Application program 2 version
+    static constexpr uint32_t commsSeg0PeiTypeOffset = 0x7F; //!< 0x337F Application program 2 PEI type
 
     ///\todo These two asserts fail, see UserEeprom::directAccess_16 for details.
     ///      The offset must be 2-byte aligned to avoid unaligned memory access.
