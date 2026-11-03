@@ -54,6 +54,22 @@ enum Hop_count_type {};
 #   define telegramSize(tel) (7 + (tel[5] & 15)) //FIXME telegramSize accesses tel[5] without any check
 #endif
 
+/**
+ * Get the index of the TPCI octet of a telegram. The APCI starts in this octet and continues
+ * in the next one. With SBLIB_MAX_APDU_LENGTH > 15 the index is 6 for a standard frame and 7 for
+ * an extended frame, see @ref lpduTpciIndex(). With the default 15 only standard frames are
+ * received, the index is the constant 6, so the generated code stays the same.
+ *
+ * @param tel - the telegram
+ *
+ * @return The index of the TPCI octet.
+ */
+#if SBLIB_MAX_APDU_LENGTH > 15
+#   define telegramTpciIndex(tel) lpduTpciIndex(tel)
+#else
+#   define telegramTpciIndex(tel) (6)
+#endif
+
 
 #endif /* SBLIB_KNX_NPDU_H_ */
 /** @}*/

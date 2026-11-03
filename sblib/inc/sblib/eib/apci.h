@@ -12,6 +12,7 @@
 
 #include <sblib/types.h>
 
+// Octets of the APCI in a standard frame only, telegramTpciIndex() works for both frame formats
 #define APCI_HIGH_BYTE       (6)
 #define APCI_LOW_BYTE        (7)
 

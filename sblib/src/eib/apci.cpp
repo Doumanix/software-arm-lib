@@ -18,11 +18,13 @@
  ---------------------------------------------------------------------------*/
 #include <sblib/bits.h>
 #include <sblib/eib/apci.h>
+#include <sblib/eib/knx_npdu.h>
 #include <sblib/utils.h>
 
 ApciCommand apciCommand(unsigned char* telegram)
 {
-    auto apci = (unsigned short)(((telegram[APCI_HIGH_BYTE] & 0x03) << 8) | telegram[APCI_LOW_BYTE]);
+    auto apci = (unsigned short)(((telegram[telegramTpciIndex(telegram)] & 0x03) << 8) |
+                                 telegram[telegramTpciIndex(telegram) + 1]);
     unsigned short shortCommand = apci & APCI_GROUP_MASK;
     switch (shortCommand)
     {
@@ -39,9 +41,9 @@ ApciCommand apciCommand(unsigned char* telegram)
 
 void setApciCommand(unsigned char* telegram, const ApciCommand newApciCommand, const uint8_t additionalData)
 {
-    telegram[APCI_HIGH_BYTE] = HIGH_BYTE(newApciCommand);
-    telegram[APCI_LOW_BYTE] = lowByte(newApciCommand);
-    telegram[APCI_LOW_BYTE] |= additionalData;
+    telegram[telegramTpciIndex(telegram)] = HIGH_BYTE(newApciCommand);
+    telegram[telegramTpciIndex(telegram) + 1] = lowByte(newApciCommand);
+    telegram[telegramTpciIndex(telegram) + 1] |= additionalData;
 }
 
 /** @}*/
