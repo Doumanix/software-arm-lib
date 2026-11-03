@@ -377,7 +377,7 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
         const int size = def->size();
         len = count * size;
         DB_PROPERTIES(serial.print("propertyValueWriteTelegram: "); printObjectIdx(objectIdx); serial.print(" "); printPropertyID(propertyId); serial.println(););
-        if (propertyId == PID_MCB_TABLE)
+        if (type >= PDT_CHAR_BLOCK) // byte arrays are stored in telegram order, like in propertyValueReadTelegram()
         {
             memcpy(valuePtr + start * size, data, len);
             memcpy(sendBuffer + 12, valuePtr + start * size, len);
