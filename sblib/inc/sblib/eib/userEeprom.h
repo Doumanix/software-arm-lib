@@ -39,6 +39,12 @@ public:
 
     explicit UserEeprom(uint32_t start, uint32_t size, uint32_t flashSize);
 
+    /**
+     * The RAM shadow of the user EEPROM.
+     *
+     * @warning Will become private once all accesses go through the API. Use new accesses only through
+     *          getUInt8/16/32, read, setUInt8/16/32, write and fill.
+     */
     ///\todo Enable deprecation warning after making userEepromData private
     //[[deprecated("Use getUInt8, getUInt16, getUInt32 or the [] operator.")]]
     alignas(FLASH_RAM_BUFFER_ALIGNMENT) uint8_t* userEepromData; // must be word aligned, otherwise iapProgram will fail
