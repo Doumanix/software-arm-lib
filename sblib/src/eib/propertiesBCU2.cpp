@@ -485,6 +485,22 @@ bool PropertiesBCU2::propertyValueReadTelegram(const int objectIdx, const Proper
     const auto type = (PropertyDataType)(def->control & PC_TYPE_MASK);
     const uint8_t* valuePtr = def->valuePointer(bcu);
 
+    // all properties of the property tables have exactly one element
+    const int numElements = 1;
+    if (start == 0)
+    {
+        // element 0 holds the current number of elements
+        sendBuffer[12] = HIGH_BYTE(numElements);
+        sendBuffer[13] = lowByte(numElements);
+        sendBuffer[5] += 2;
+        return true;
+    }
+
+    if (start + count - 1 > numElements)
+    {
+        return false; // elements out of range
+    }
+
     --start;
     const int size = def->size();
     const int len = count * size;
@@ -532,9 +548,26 @@ bool PropertiesBCU2::propertyValueWriteTelegram(const int objectIdx, const Prope
     }
     else
     {
+        // all properties of the property tables have exactly one element
+        const int numElements = 1;
+        if (start == 0)
+        {
+            return false; // writing element 0 would reset the number of elements, not supported
+        }
+
+        if (start + count - 1 > numElements)
+        {
+            return false; // elements out of range
+        }
+
         --start;
         const int size = def->size();
         len = count * size;
+        if ((len > 10) || (len > (bcu->bus->telegramLen - 13)))
+        {
+            return false; // data does not fit into the telegram
+        }
+
         DB_PROPERTIES(serial.print("propertyValueWriteTelegram: "); printObjectIdx(objectIdx); serial.print(" "); printPropertyID(propertyId);serial.println(););
         reverseCopy(valuePtr + start * size, data, len);
         reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
