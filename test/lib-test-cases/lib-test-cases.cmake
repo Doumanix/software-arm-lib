@@ -23,6 +23,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_ioports.cpp
         src/test_ioports_get_pin_function_number.cpp
         src/test_knx_lpdu.cpp
+        src/test_knx_lpdu_frames.cpp
         src/test_mem_mapper.cpp
         src/test_platform.cpp
         src/test_print.cpp

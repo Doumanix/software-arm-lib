@@ -44,13 +44,14 @@ target_compile_options(rp2350_host_tests PRIVATE -Wall -Wextra -Wno-unused-param
 add_test(NAME rp2350_host_tests COMMAND rp2350_host_tests)
 
 # White-box bus invariants without changing the production class definition.
-set_source_files_properties(src/test_bus.cpp PROPERTIES COMPILE_OPTIONS -fno-access-control)
+set_source_files_properties(src/test_bus.cpp src/test_bus_lf.cpp PROPERTIES COMPILE_OPTIONS -fno-access-control)
 
 # KNX bus (src/eib/bus.cpp, unchanged) on top of the timer emulation and a simulated bus line
 add_executable(rp2350_bus_tests
     src/main.cpp
     src/test_bus.cpp
     src/test_bus_t9.cpp
+    src/test_bus_lf.cpp
     sim/pico_sim.cpp
     ${SBLIB_PATH}/src/eib/bus.cpp
     ${SBLIB_PATH}/src/eib/knx_lpdu.cpp
@@ -81,6 +82,22 @@ foreach(name rp2350_host_tests rp2350_bus_tests)
     target_compile_definitions(${name}_pio PRIVATE ${_definitions} SBLIB_RP2350_PIO_BUS)
     target_compile_options(${name}_pio PRIVATE -Wall -Wextra -Wno-unused-parameter)
     add_test(NAME ${name}_pio COMMAND ${name}_pio)
+endforeach()
+
+# The bus tests with L_Data_Extended frames (CMake option SBLIB_MAX_APDU_LENGTH of the sblib):
+# 254 with all bus tests, 56 for a frame above the buffer size
+foreach(length 254 56)
+    get_target_property(_sources rp2350_bus_tests SOURCES)
+    get_target_property(_includes rp2350_bus_tests INCLUDE_DIRECTORIES)
+    get_target_property(_definitions rp2350_bus_tests COMPILE_DEFINITIONS)
+    if(length EQUAL 56)
+        list(REMOVE_ITEM _sources src/test_bus_t9.cpp)
+    endif()
+    add_executable(rp2350_bus_tests_lf${length} ${_sources})
+    target_include_directories(rp2350_bus_tests_lf${length} PRIVATE ${_includes})
+    target_compile_definitions(rp2350_bus_tests_lf${length} PRIVATE ${_definitions} SBLIB_MAX_APDU_LENGTH=${length})
+    target_compile_options(rp2350_bus_tests_lf${length} PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    add_test(NAME rp2350_bus_tests_lf${length} COMMAND rp2350_bus_tests_lf${length})
 endforeach()
 
 # Flash and pin modules compile unchanged against the SDK simulation.
