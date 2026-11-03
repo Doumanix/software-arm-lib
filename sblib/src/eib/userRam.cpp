@@ -145,5 +145,69 @@ uint16_t UserRam::getUInt16(uint32_t address) const
     return makeWord(userRamData[address], userRamData[address + 1]);
 }
 
+uint32_t UserRam::getUInt32(uint32_t address) const
+{
+    if (!rangeValid(address, 4))
+    {
+        return 0;
+    }
+    normalizeAddress(&address);
+    uint32_t value = makeWord(userRamData[address], userRamData[address + 1]);
+    value <<= 16;
+    value |= makeWord(userRamData[address + 2], userRamData[address + 3]);
+    return value;
+}
+
+bool UserRam::read(uint32_t address, uint8_t* dst, const uint32_t count) const
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    memcpy(dst, userRamData + address, count);
+    return true;
+}
+
+bool UserRam::setUInt8(const uint32_t address, const uint8_t value)
+{
+    return write(address, &value, 1);
+}
+
+bool UserRam::setUInt16(const uint32_t address, const uint16_t value)
+{
+    const uint8_t bytes[2] = {static_cast<uint8_t>(value >> 8), static_cast<uint8_t>(value)};
+    return write(address, bytes, sizeof(bytes));
+}
+
+bool UserRam::setUInt32(const uint32_t address, const uint32_t value)
+{
+    const uint8_t bytes[4] = {static_cast<uint8_t>(value >> 24), static_cast<uint8_t>(value >> 16),
+                               static_cast<uint8_t>(value >> 8), static_cast<uint8_t>(value)};
+    return write(address, bytes, sizeof(bytes));
+}
+
+bool UserRam::write(uint32_t address, const uint8_t* src, const uint32_t count)
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    memcpy(userRamData + address, src, count);
+    return true;
+}
+
+bool UserRam::fill(uint32_t address, const uint32_t count, const uint8_t value)
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    memset(userRamData + address, value, count);
+    return true;
+}
+
 
 /** @}*/

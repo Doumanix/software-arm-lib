@@ -169,6 +169,86 @@ uint16_t UserEeprom::getUInt16(uint32_t address) const
     return makeWord(userEepromData[address], userEepromData[address + 1]);
 }
 
+uint32_t UserEeprom::getUInt32(uint32_t address) const
+{
+    if (!rangeValid(address, 4))
+    {
+        return 0;
+    }
+    normalizeAddress(&address);
+    uint32_t value = makeWord(userEepromData[address], userEepromData[address + 1]);
+    value <<= 16;
+    value |= makeWord(userEepromData[address + 2], userEepromData[address + 3]);
+    return value;
+}
+
+bool UserEeprom::read(uint32_t address, uint8_t* dst, const uint32_t count) const
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    memcpy(dst, userEepromData + address, count);
+    return true;
+}
+
+bool UserEeprom::setUInt8(const uint32_t address, const uint8_t value)
+{
+    return write(address, &value, 1);
+}
+
+bool UserEeprom::setUInt16(const uint32_t address, const uint16_t value)
+{
+    const uint8_t bytes[2] = {static_cast<uint8_t>(value >> 8), static_cast<uint8_t>(value)};
+    return write(address, bytes, sizeof(bytes));
+}
+
+bool UserEeprom::setUInt32(const uint32_t address, const uint32_t value)
+{
+    const uint8_t bytes[4] = {static_cast<uint8_t>(value >> 24), static_cast<uint8_t>(value >> 16),
+                               static_cast<uint8_t>(value >> 8), static_cast<uint8_t>(value)};
+    return write(address, bytes, sizeof(bytes));
+}
+
+bool UserEeprom::write(uint32_t address, const uint8_t* src, const uint32_t count)
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    if (memcmp(userEepromData + address, src, count) != 0)
+    {
+        memcpy(userEepromData + address, src, count);
+        modified(true);
+    }
+    return true;
+}
+
+bool UserEeprom::fill(uint32_t address, const uint32_t count, const uint8_t value)
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    bool changed = false;
+    for (uint32_t i = 0; i < count; i++)
+    {
+        if (userEepromData[address + i] != value)
+        {
+            userEepromData[address + i] = value;
+            changed = true;
+        }
+    }
+    if (changed)
+    {
+        modified(true);
+    }
+    return true;
+}
+
 void UserEeprom::modified(const bool newModified)
 {
     userEepromModified = newModified;
