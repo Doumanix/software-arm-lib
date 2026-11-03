@@ -332,6 +332,115 @@ void setFrameType(uint8_t* telegram, KNXFrameType newFrameType);
 }
 
 /**
+ * @brief Set the source address of a standard or an extended frame.
+ * @param telegram         Pointer to the telegram buffer, the frame type must be set
+ * @param newSenderAddress The sender's physical address
+ */
+constexpr void lpduSetSenderAddress(uint8_t* telegram, const uint16_t newSenderAddress)
+{
+    const uint8_t index = lpduSenderIndex(telegram);
+    telegram[index] = static_cast<uint8_t>(newSenderAddress >> 8);
+    telegram[index + 1] = static_cast<uint8_t>(newSenderAddress & 0xff);
+}
+
+/**
+ * @brief Set the destination address of a standard or an extended frame.
+ * @param telegram              Pointer to the telegram buffer, the frame type must be set
+ * @param newDestinationAddress The destination address (physical or group)
+ */
+constexpr void lpduSetDestinationAddress(uint8_t* telegram, const uint16_t newDestinationAddress)
+{
+    const uint8_t index = lpduSenderIndex(telegram) + 2;
+    telegram[index] = static_cast<uint8_t>(newDestinationAddress >> 8);
+    telegram[index + 1] = static_cast<uint8_t>(newDestinationAddress & 0xff);
+}
+
+/**
+ * @brief Set the address type flag (AT) of a standard or an extended frame.
+ * @param telegram     Pointer to the telegram buffer, the frame type must be set
+ * @param groupAddress True for a group address, false for a physical address
+ */
+constexpr void lpduSetGroupAddress(uint8_t* telegram, const bool groupAddress)
+{
+    const uint8_t index = lpduAddressTypeIndex(telegram);
+    if (groupAddress)
+    {
+        telegram[index] |= 0x80;
+    }
+    else
+    {
+        telegram[index] &= 0x7f;
+    }
+}
+
+/**
+ * @brief Set the APDU length (number of octets after the TPCI octet) of a standard or an extended frame.
+ * @param telegram   Pointer to the telegram buffer, the frame type must be set
+ * @param apduLength 0..15 for a standard frame (octet 5, bits 0..3), 0..254 for an extended frame (octet 6)
+ */
+constexpr void lpduSetApduLength(uint8_t* telegram, const uint8_t apduLength)
+{
+    if (isExtendedFrame(telegram))
+    {
+        telegram[6] = apduLength;
+    }
+    else
+    {
+        telegram[5] = static_cast<uint8_t>((telegram[5] & 0xf0) | (apduLength & 0x0f));
+    }
+}
+
+/**
+ * @brief Write the header of a standard frame (KNX 3/2/2 2.2.4) up to the TPCI octet.
+ * @details CTRL: frame type 1, not repeated, priority. Octet 5: address type, hop count, APDU length.
+ * @param telegram     Pointer to the telegram buffer
+ * @param newPriority  Priority of the frame
+ * @param sender       Source address (the bus sets the own address when sending)
+ * @param destination  Destination address (physical or group)
+ * @param groupAddress True if destination is a group address
+ * @param hopCount     Hop count 0..7
+ * @param apduLength   Number of octets after the TPCI octet, 0..15
+ * @return The index of the TPCI octet (6)
+ */
+constexpr uint8_t lpduInitStandardFrame(uint8_t* telegram, const KNXPriority newPriority, const uint16_t sender,
+                                        const uint16_t destination, const bool groupAddress, const uint8_t hopCount,
+                                        const uint8_t apduLength)
+{
+    telegram[0] = static_cast<uint8_t>(0xb0 | (newPriority & 0x03) << 2);
+    telegram[5] = static_cast<uint8_t>((hopCount & 0x07) << 4);
+    lpduSetSenderAddress(telegram, sender);
+    lpduSetDestinationAddress(telegram, destination);
+    lpduSetGroupAddress(telegram, groupAddress);
+    lpduSetApduLength(telegram, apduLength);
+    return lpduTpciIndex(telegram);
+}
+
+/**
+ * @brief Write the header of an L_Data_Extended frame (KNX 3/2/2 2.2.5) up to the TPCI octet.
+ * @details CTRL: frame type 0, not repeated, priority. CTRLE: address type, hop count, extended frame format 0000b.
+ * @param telegram     Pointer to the telegram buffer
+ * @param newPriority  Priority of the frame
+ * @param sender       Source address (the bus sets the own address when sending)
+ * @param destination  Destination address (physical or group)
+ * @param groupAddress True if destination is a group address
+ * @param hopCount     Hop count 0..7
+ * @param apduLength   Number of octets after the TPCI octet, 0..254
+ * @return The index of the TPCI octet (7)
+ */
+constexpr uint8_t lpduInitExtendedFrame(uint8_t* telegram, const KNXPriority newPriority, const uint16_t sender,
+                                        const uint16_t destination, const bool groupAddress, const uint8_t hopCount,
+                                        const uint8_t apduLength)
+{
+    telegram[0] = static_cast<uint8_t>(0x30 | (newPriority & 0x03) << 2);
+    telegram[1] = static_cast<uint8_t>((hopCount & 0x07) << 4);
+    lpduSetSenderAddress(telegram, sender);
+    lpduSetDestinationAddress(telegram, destination);
+    lpduSetGroupAddress(telegram, groupAddress);
+    lpduSetApduLength(telegram, apduLength);
+    return lpduTpciIndex(telegram);
+}
+
+/**
  * Return the area number of a given physical KNX address
  * @param address Individual KNX address
  * @return The area number of the individual address
