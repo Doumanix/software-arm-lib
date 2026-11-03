@@ -91,6 +91,58 @@ public:
     [[nodiscard]] virtual bool read(uint32_t address, uint8_t* dst, uint32_t count) const = 0;
 
     /**
+     * Sets a byte in the memory at given @ref address
+     *
+     * @param address   Address of the byte
+     * @param value     New content
+     * @return          True if @ref address is accessible and the byte was set, otherwise false
+     * @note @ref startAddress will be subtracted from @ref address
+     */
+    virtual bool setUInt8(uint32_t address, uint8_t value) = 0;
+
+    /**
+     * Sets a word (big endian, like @ref getUInt16) in the memory at given @ref address and address + 1
+     *
+     * @param address   Address of the first byte
+     * @param value     New content
+     * @return          True if the range is accessible and the word was set, otherwise false and nothing is changed
+     * @note @ref startAddress will be subtracted from @ref address
+     */
+    virtual bool setUInt16(uint32_t address, uint16_t value) = 0;
+
+    /**
+     * Sets a double word (big endian, like @ref getUInt32) in the memory at given @ref address up to address + 3
+     *
+     * @param address   Address of the first byte
+     * @param value     New content
+     * @return          True if the range is accessible and the double word was set, otherwise false and nothing is changed
+     * @note @ref startAddress will be subtracted from @ref address
+     */
+    virtual bool setUInt32(uint32_t address, uint32_t value) = 0;
+
+    /**
+     * Copies @ref count bytes from @ref src to the memory at given @ref address
+     *
+     * @param address   Address of the first byte to set
+     * @param src       Source buffer with at least @ref count bytes
+     * @param count     Number of bytes to copy
+     * @return          True if the whole range is accessible and was copied, otherwise false and nothing is changed
+     * @note @ref startAddress will be subtracted from @ref address
+     */
+    virtual bool write(uint32_t address, const uint8_t* src, uint32_t count) = 0;
+
+    /**
+     * Sets @ref count bytes of the memory at given @ref address to @ref value
+     *
+     * @param address   Address of the first byte to set
+     * @param count     Number of bytes to set
+     * @param value     Value for every byte
+     * @return          True if the whole range is accessible and was set, otherwise false and nothing is changed
+     * @note @ref startAddress will be subtracted from @ref address
+     */
+    virtual bool fill(uint32_t address, uint32_t count, uint8_t value) = 0;
+
+    /**
      * Checks, if an @ref address is accessible in the memory
      *
      * @param address   Address to check for valid access

@@ -35,6 +35,12 @@ public:
     [[nodiscard]] uint32_t getUInt32([[maybe_unused]] uint32_t address) const override { return 0;}
     [[nodiscard]] bool read([[maybe_unused]] uint32_t address, [[maybe_unused]] uint8_t* dst, [[maybe_unused]] uint32_t count) const override { return false;}
 
+    bool setUInt8([[maybe_unused]] uint32_t address, [[maybe_unused]] uint8_t value) override { return false;}
+    bool setUInt16([[maybe_unused]] uint32_t address, [[maybe_unused]] uint16_t value) override { return false;}
+    bool setUInt32([[maybe_unused]] uint32_t address, [[maybe_unused]] uint32_t value) override { return false;}
+    bool write([[maybe_unused]] uint32_t address, [[maybe_unused]] const uint8_t* src, [[maybe_unused]] uint32_t count) override { return false;}
+    bool fill([[maybe_unused]] uint32_t address, [[maybe_unused]] uint32_t count, [[maybe_unused]] uint8_t value) override { return false;}
+
 private:
     mutable uint8_t dummyByte = 0;
 };

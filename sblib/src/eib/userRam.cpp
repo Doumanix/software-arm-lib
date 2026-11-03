@@ -169,5 +169,45 @@ bool UserRam::read(uint32_t address, uint8_t* dst, const uint32_t count) const
     return true;
 }
 
+bool UserRam::setUInt8(const uint32_t address, const uint8_t value)
+{
+    return write(address, &value, 1);
+}
+
+bool UserRam::setUInt16(const uint32_t address, const uint16_t value)
+{
+    const uint8_t bytes[2] = {static_cast<uint8_t>(value >> 8), static_cast<uint8_t>(value)};
+    return write(address, bytes, sizeof(bytes));
+}
+
+bool UserRam::setUInt32(const uint32_t address, const uint32_t value)
+{
+    const uint8_t bytes[4] = {static_cast<uint8_t>(value >> 24), static_cast<uint8_t>(value >> 16),
+                               static_cast<uint8_t>(value >> 8), static_cast<uint8_t>(value)};
+    return write(address, bytes, sizeof(bytes));
+}
+
+bool UserRam::write(uint32_t address, const uint8_t* src, const uint32_t count)
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    memcpy(userRamData + address, src, count);
+    return true;
+}
+
+bool UserRam::fill(uint32_t address, const uint32_t count, const uint8_t value)
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    memset(userRamData + address, value, count);
+    return true;
+}
+
 
 /** @}*/
