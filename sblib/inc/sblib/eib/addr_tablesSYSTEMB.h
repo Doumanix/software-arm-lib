@@ -24,7 +24,8 @@ public:
      * Get the index of a group address in the address table.
      *
      * @param addr - the address to find.
-     * @return The index of the address, -1 if not found.
+     * @return The index of the address, -1 if not found. 0 if the table has count 0, which
+     * accepts all group addresses (03_05_01 4.16.8.2.4); such an address has no association.
      *
      * @brief The address table starts with a 16 bit count followed by the
      * configured group addresses. The index of the first group address is 1.

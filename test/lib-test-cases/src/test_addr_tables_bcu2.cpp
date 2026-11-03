@@ -125,11 +125,13 @@ TEST_CASE("SYSTEMB address table count excludes the individual address", "[addr_
 {
     TestAddrTablesSYSTEMB table;
 
-    SECTION("count zero is empty")
+    SECTION("count zero accepts all group addresses without an index")
     {
         table.bytes[0] = 0;
         table.bytes[1] = 0;
-        CHECK(table.indexOfAddr(0x1401) == -1);
+        putAddress(table.bytes.data() + 2, 0, 0x1401);
+        CHECK(table.indexOfAddr(0x1401) == 0);
+        CHECK(table.indexOfAddr(0x0064) == 0);
     }
 
     SECTION("count one holds one group address")
