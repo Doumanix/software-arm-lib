@@ -298,7 +298,12 @@ bool Bus::canPause(const bool waitForTelegramSent) const
 
 void Bus::prepareTelegram(uint8_t* telegram, const uint16_t length) const
 {
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // Standard frame: octets 1/2, extended frame: octets 2/3
+    lpduSetSenderAddress(telegram, ownAddress);
+#else
     setSenderAddress(telegram, ownAddress);
+#endif
 
     // Calculate the checksum
     uint8_t checksum = 0xff;
@@ -324,6 +329,16 @@ void Bus::prepareTelegram(uint8_t* telegram, const uint16_t length) const
  */
 void Bus::sendTelegram(uint8_t* telegram, const uint16_t length)
 {
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // The frame and its checksum must fit into the telegram buffers (KNX 3/2/2 2.2.5)
+    if (length + 1 > TelegramBufferSize)
+    {
+        IF_DEBUG(fatalError());
+        callBack->finishedSendingTelegram(false);
+        return;
+    }
+#endif
+
     prepareTelegram(telegram, length);
 
     // Wait until there is space in the sending queue

@@ -42,7 +42,11 @@
     volatile unsigned char telBuffer[32];
 #   endif
     volatile unsigned int telLength = 0;
+#   if SBLIB_MAX_APDU_LENGTH > 15
+    volatile unsigned char txtelBuffer[TelegramBufferSize];
+#   else
     volatile unsigned char txtelBuffer[32];
+#   endif
     volatile unsigned int txtelLength = 0;
     volatile unsigned int tx_rep_count = 0;
     volatile unsigned int tx_busy_rep_count = 0;

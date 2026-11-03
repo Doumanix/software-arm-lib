@@ -48,7 +48,11 @@
     extern volatile unsigned char telBuffer[32]; //!< buffer to dump a rx telegram info to the serial line including collisions and rx-timing (in ms)
 #   endif
     extern volatile unsigned int telLength;
+#   if SBLIB_MAX_APDU_LENGTH > 15
+    extern volatile unsigned char txtelBuffer[TelegramBufferSize];
+#   else
     extern volatile unsigned char txtelBuffer[32];
+#   endif
     extern volatile unsigned int txtelLength;
     extern volatile unsigned int tx_rep_count;
     extern volatile unsigned int tx_busy_rep_count;
