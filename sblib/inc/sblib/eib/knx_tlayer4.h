@@ -63,7 +63,7 @@ public:
      * @param telegram  The telegram to process
      * @param telLength Length of the telegram
      */
-    void processTelegram(unsigned char* telegram, uint8_t telLength);
+    void processTelegram(unsigned char* telegram, TelegramLength telLength);
 
     /**
      * Test if a connection-oriented connection is open.
@@ -176,7 +176,7 @@ private:
     /**
      * Internal processing of the received telegram from bus.telegram. Called by processTelegram
      */
-    void processTelegramInternal(unsigned char* telegram, uint8_t telLength);
+    void processTelegramInternal(unsigned char* telegram, TelegramLength telLength);
 
     /**
      * Sets a new state @ref TL4State for the transport layer state machine
@@ -196,7 +196,7 @@ private:
      * @param telegram   Pointer to the telegram data.
      * @param telLength  The length of the telegram in bytes.
      */
-    void processConControlTelegram(const uint16_t& senderAddr, const TPDU& tpci, unsigned char* telegram, const uint8_t& telLength);
+    void processConControlTelegram(const uint16_t& senderAddr, const TPDU& tpci, unsigned char* telegram, const TelegramLength& telLength);
 
     /**
      * @brief Process a TP Layer 4 @ref T_CONNECT_PDU
@@ -226,7 +226,7 @@ private:
      * @param telLength  The length of the telegram in bytes.
      * @return true if successful, otherwise false
      */
-    bool processConControlAcknowledgmentPDU(uint16_t senderAddr, const TPDU& tpci, unsigned char* telegram, uint8_t telLength);
+    bool processConControlAcknowledgmentPDU(uint16_t senderAddr, const TPDU& tpci, unsigned char* telegram, TelegramLength telLength);
 
     /**
      * Process an unicast telegram with our physical address as destination address.
@@ -238,7 +238,7 @@ private:
      * @param telegram   Pointer to the telegram data.
      * @param telLength  The length of the telegram in bytes.
      */
-    void processDirectTelegram(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength);
+    void processDirectTelegram(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength);
 
     /**
      * Forward the connection-oriented telegram in @ref sendConnectedTelegram to @ref sendTelegram
@@ -248,7 +248,7 @@ private:
 
     void actionA00Nothing();
     void actionA01Connect(uint16_t address);
-    void actionA02sendAckPduAndProcessApci(ApciCommand apciCmd, const int8_t seqNo, unsigned char* telegram, uint8_t telLength);
+    void actionA02sendAckPduAndProcessApci(ApciCommand apciCmd, const int8_t seqNo, unsigned char* telegram, TelegramLength telLength);
 
     /**
      * Performs action A3 as described in the KNX Spec. 2.1 3/3/4 5.3 p.19

@@ -65,7 +65,7 @@ uint16_t disconnectCount = 0; //!< number of disconnects since system reset
 uint16_t repeatedT_ACKcount = 0;
 
 void dumpTelegramBytes([[maybe_unused]] const bool tx, [[maybe_unused]] const unsigned char* telegram,
-    [[maybe_unused]] const uint8_t length, [[maybe_unused]] const bool newLine = true)
+    [[maybe_unused]] const TelegramLength length, [[maybe_unused]] const bool newLine = true)
 {
     dump2(
         serial.print(LOG_SEP);
@@ -78,7 +78,7 @@ void dumpTelegramBytes([[maybe_unused]] const bool tx, [[maybe_unused]] const un
             serial.print("RX: ");
         }
 
-        for (uint8_t i = 0; i < length; i++)
+        for (TelegramLength i = 0; i < length; i++)
         {
             serial.print(telegram[i], HEX, 2);
             serial.print(" ");
@@ -264,7 +264,7 @@ void TLayer4::_begin()
     repeatedT_ACKcount = 0;
 }
 
-void TLayer4::processTelegram(unsigned char* telegram, const uint8_t telLength)
+void TLayer4::processTelegram(unsigned char* telegram, const TelegramLength telLength)
 {
 #if SBLIB_MAX_APDU_LENGTH > 15
     // The transport layer reads the octets of a standard frame. Until it knows the extended frame,
@@ -279,9 +279,9 @@ void TLayer4::processTelegram(unsigned char* telegram, const uint8_t telLength)
     discardReceivedTelegram();
 }
 
-void TLayer4::processTelegramInternal(unsigned char* telegram, const uint8_t telLength)
+void TLayer4::processTelegramInternal(unsigned char* telegram, const TelegramLength telLength)
 {
-    const uint16_t destAddr = destinationAddress(telegram);
+    const uint16_t destAddr = telegramDestinationAddress(telegram);
     const ApciCommand apciCmd = apciCommand(telegram);
 
     if (destAddr == 0)
@@ -290,7 +290,7 @@ void TLayer4::processTelegramInternal(unsigned char* telegram, const uint8_t tel
         processBroadCastTelegram(apciCmd, telegram, telLength);
         return;
     }
-    else if ((telegram[5] & T_GROUP_ADDRESS_FLAG_Msk)) ///\todo function for this in knx_tpdu.h
+    else if (telegramIsGroupAddress(telegram))
     {
         // a group address telegram
         processGroupAddressTelegram(apciCmd, destAddr, telegram, telLength);
@@ -303,11 +303,11 @@ void TLayer4::processTelegramInternal(unsigned char* telegram, const uint8_t tel
     }
 
     ///\todo function to get tpciCommand in knx_tpdu.h
-    unsigned char tpci = telegram[6] & 0xc3; //0b11000011 Transport control field (see KNX 3/3/4 p.6 TPDU)
-    const uint16_t senderAddr = senderAddress(telegram);
+    unsigned char tpci = telegram[telegramTpciIndex(telegram)] & 0xc3; //0b11000011 Transport control field (see KNX 3/3/4 p.6 TPDU)
+    const uint16_t senderAddr = telegramSenderAddress(telegram);
 
     dump2(telegramCount++;);
-    dumpTelegramInfo(telegram, senderAddr, telegram[6], false, state);
+    dumpTelegramInfo(telegram, senderAddr, telegram[telegramTpciIndex(telegram)], false, state);
 
     if (tpci & T_CONNECTION_CTRL_COMMAND_Msk) // A connection control command
     {
@@ -319,7 +319,7 @@ void TLayer4::processTelegramInternal(unsigned char* telegram, const uint8_t tel
     }
 }
 
-void TLayer4::processConControlTelegram(const uint16_t& senderAddr, const TPDU& tpci, unsigned char* telegram, const uint8_t& telLength)
+void TLayer4::processConControlTelegram(const uint16_t& senderAddr, const TPDU& tpci, unsigned char* telegram, const TelegramLength& telLength)
 {
     bool result = false;
     switch (tpci)
@@ -429,7 +429,7 @@ bool TLayer4::processConControlDisconnectPDU(const uint16_t senderAddr)
     return (true);
 }
 
-bool TLayer4::processConControlAcknowledgmentPDU(const uint16_t senderAddr, const TPDU& tpci, unsigned char* telegram, const uint8_t telLength)
+bool TLayer4::processConControlAcknowledgmentPDU(const uint16_t senderAddr, const TPDU& tpci, unsigned char* telegram, const TelegramLength telLength)
 {
     if (!(tpci & T_ACKNOWLEDGE_Msk))
     {
@@ -634,17 +634,17 @@ void TLayer4::finishedSendingTelegram(const bool successful)
     }
 }
 
-void TLayer4::processDirectTelegram(const ApciCommand apciCmd, unsigned char* telegram, const uint8_t telLength)
+void TLayer4::processDirectTelegram(const ApciCommand apciCmd, unsigned char* telegram, const TelegramLength telLength)
 {
     dump2(
         serial.print("DirectTele");
         serial.print(LOG_SEP);
     );
 
-    const uint16_t senderAddr = senderAddress(telegram);
+    const uint16_t senderAddr = telegramSenderAddress(telegram);
 
     ///\todo function to check for individual_pdu in knx_tpdu.h
-    unsigned char tpci = telegram[6] & 0xfc; //0b11111100 Transport control field (see KNX 3/3/4 p.6 TPDU)
+    unsigned char tpci = telegram[telegramTpciIndex(telegram)] & 0xfc; //0b11111100 Transport control field (see KNX 3/3/4 p.6 TPDU)
     if (tpci == 0)
     {
         // T_Data_Individual-PDU: Allow implementations to overwrite fields (priority, destination)
@@ -762,7 +762,7 @@ void TLayer4::actionA01Connect(const uint16_t address)
     dump2(lastTick = connectedTime;); // for debug logging
 }
 
-void TLayer4::actionA02sendAckPduAndProcessApci(const ApciCommand apciCmd, const int8_t seqNo, unsigned char* telegram, const uint8_t telLength)
+void TLayer4::actionA02sendAckPduAndProcessApci(const ApciCommand apciCmd, const int8_t seqNo, unsigned char* telegram, const TelegramLength telLength)
 {
     dump2(serial.print("actionA02 "));
     dumpTelegramBytes(false, telegram, telLength);
@@ -861,7 +861,7 @@ void TLayer4::actionA07SendDirectTelegram()
 
     dump2(
         telegramCount++;
-        dumpTelegramInfo(sendConnectedTelegram, connectedAddr, sendConnectedTelegram[6], true, state);
+        dumpTelegramInfo(sendConnectedTelegram, connectedAddr, sendConnectedTelegram[telegramTpciIndex(sendConnectedTelegram)], true, state);
         serial.print("sendDirectT");
         serial.print(LOG_SEP);
         serial.print("A07SendTelegram");

@@ -70,6 +70,24 @@ enum Hop_count_type {};
 #   define telegramTpciIndex(tel) (6)
 #endif
 
+/**
+ * Get the source address, the destination address and the address type of a telegram. With
+ * SBLIB_MAX_APDU_LENGTH > 15 for both frame formats, see @ref lpduSenderAddress(),
+ * @ref lpduDestinationAddress() and @ref lpduIsGroupAddress(). With the default 15 only standard
+ * frames are received and the standard frame functions are used, so the generated code stays the same.
+ *
+ * @param tel - the telegram
+ */
+#if SBLIB_MAX_APDU_LENGTH > 15
+#   define telegramSenderAddress(tel) lpduSenderAddress(tel)
+#   define telegramDestinationAddress(tel) lpduDestinationAddress(tel)
+#   define telegramIsGroupAddress(tel) lpduIsGroupAddress(tel)
+#else
+#   define telegramSenderAddress(tel) senderAddress(tel)
+#   define telegramDestinationAddress(tel) destinationAddress(tel)
+#   define telegramIsGroupAddress(tel) ((tel)[5] & 0x80)
+#endif
+
 
 #endif /* SBLIB_KNX_NPDU_H_ */
 /** @}*/

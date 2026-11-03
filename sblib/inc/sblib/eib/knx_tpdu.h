@@ -23,6 +23,7 @@
 #define SBLIB_KNX_TPDU_H_
 
 #include <sblib/types.h>
+#include <sblib/eib/knx_npdu.h>
 
 #define TPDU_HIGH_BYTE (5)
 #define TPDU_LOW_BYTE (6)
@@ -65,7 +66,7 @@ enum
 
 inline uint8_t sequenceNumber(const unsigned char* telegram)
 {
-    uint8_t tpci = telegram[TPDU_LOW_BYTE];
+    uint8_t tpci = telegram[telegramTpciIndex(telegram)];
     if (tpci != 0xFF)
     {
         return ((tpci & T_SEQUENCE_NUMBER_Msk) >> T_SEQUENCE_NUMBER_FIRST_BIT_Pos);

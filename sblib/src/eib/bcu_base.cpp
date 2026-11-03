@@ -85,7 +85,7 @@ void BcuBase::loop()
     //
     if (bus->telegramReceived() && !bus->sendingFrame() && (layerStatus() & BCU_STATUS_TRANSPORT_LAYER))
     {
-        processTelegram(bus->telegram, (uint8_t)bus->telegramLen); // if processed successfully, received telegram will be discarded by processTelegram()
+        processTelegram(bus->telegram, bus->telegramLen); // if processed successfully, received telegram will be discarded by processTelegram()
     }
 
     if (progPin)
