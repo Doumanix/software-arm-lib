@@ -16,6 +16,14 @@ endif()
 
 project(sblib LANGUAGES CXX VERSION 2.10)
 
+# Maximum APDU length of a received telegram (number of octets after the TPCI octet, KNX 3/2/2 2.2.5).
+# 15 is the default and accepts standard frames only. 16..254 also accepts L_Data_Extended frames;
+# the telegram buffers then grow to 9 + SBLIB_MAX_APDU_LENGTH bytes.
+set(SBLIB_MAX_APDU_LENGTH 15 CACHE STRING "Maximum APDU length of a received telegram (15..254, 15: standard frames only)")
+if(NOT SBLIB_MAX_APDU_LENGTH MATCHES "^[0-9]+$" OR SBLIB_MAX_APDU_LENGTH LESS 15 OR SBLIB_MAX_APDU_LENGTH GREATER 254)
+    message(FATAL_ERROR "SBLIB_MAX_APDU_LENGTH (${SBLIB_MAX_APDU_LENGTH}) must be a number from 15 to 254")
+endif()
+
 if(SBLIB_MCU STREQUAL "RP2350")
     enable_language(C ASM)
     if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -49,6 +57,7 @@ if(SBLIB_MCU STREQUAL "RP2350")
         $<$<CONFIG:Debug>:DEBUG>
         $<$<BOOL:${SBLIB_RP2350_TIMER_STATS}>:SBLIB_RP2350_TIMER_STATS>
         $<$<BOOL:${SBLIB_RP2350_PIO_BUS}>:SBLIB_RP2350_PIO_BUS>
+        SBLIB_MAX_APDU_LENGTH=${SBLIB_MAX_APDU_LENGTH}
     )
     target_link_libraries(sblib_rp2350 PUBLIC
         hardware_clocks
@@ -142,6 +151,8 @@ add_library(${TARGET_X64} STATIC ${SBLIB_SRC}) # 64bit sblib
 foreach(target ${TARGET_ARM} ${TARGET_X86} ${TARGET_X64})
     # sblib
     target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+    # The telegram buffer size depends on it, so the application needs the same value
+    target_compile_definitions(${target} PUBLIC SBLIB_MAX_APDU_LENGTH=${SBLIB_MAX_APDU_LENGTH})
 endforeach()
 
 # ARM includes
