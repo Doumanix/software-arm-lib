@@ -44,6 +44,7 @@ public:
     inline const ComConfig& objectConfig(int objno) override;
 
 protected:
+    int objectCount() override;
     int objectSize(int objno) override;
     uint8_t* objectValuePtr(int objno) override;
     void processGroupTelegram(uint16_t addr, int apci, uint8_t* tel, int trg_objno) override;

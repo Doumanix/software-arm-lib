@@ -12,6 +12,17 @@
 #include <sblib/bits.h>
 #include <sblib/eib/typesSYSTEMB.h>
 
+int ComObjectsSYSTEMB::objectCount()
+{
+    // Spec: Resources 4.18.6 Group Object Table - Realization Type 7, the number of group objects has 2 octets
+    const uint8_t* table = objectConfigTable();
+    if (table == nullptr)
+    {
+        return (0);
+    }
+    return (makeWord(table[0], table[1]));
+}
+
 int ComObjectsSYSTEMB::objectSize(const int objno)
 {
     // KNX spec v2.1 3/5/1 p. 178 (section 4.12.5.2.4.1.4)

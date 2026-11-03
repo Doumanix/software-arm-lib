@@ -17,6 +17,7 @@ namespace
 {
     constexpr uint16_t AddrTableAddress = 0x3400;
     constexpr uint16_t AssocTableAddress = 0x3800;
+    constexpr uint16_t ObjectTableAddress = 0x3c00;
 
     class ComObjectsProbe final : public ComObjectsSYSTEMB
     {
@@ -26,6 +27,7 @@ namespace
         {}
 
         using ComObjectsSYSTEMB::firstObjectAddr;
+        using ComObjectsSYSTEMB::objectCount;
     };
 
     class TestBcu final : public SYSTEMB
@@ -45,6 +47,7 @@ namespace
         {
             bcu.userEeprom->addrTabAddr() = AddrTableAddress;
             bcu.userEeprom->assocTabAddr() = AssocTableAddress;
+            bcu.userEeprom->commsTabAddr() = ObjectTableAddress;
         }
 
         uint8_t* memory(const uint16_t address)
@@ -71,6 +74,10 @@ namespace
             putWord(ptr, addressIndex);
             putWord(ptr + 2, objno);
         }
+
+        void setObjectCount(const int count) { putWord(memory(ObjectTableAddress), count); }
+
+        int objectCount() { return static_cast<ComObjectsProbe*>(bcu.comObjects)->objectCount(); }
 
         int firstObjectAddr(const int objno)
         {
@@ -139,5 +146,28 @@ TEST_CASE("SYSTEMB first group address of a com object", "[com_objects_systemb]"
         f.setAssocCount(1);
         f.putAssoc(0, 0, 5);
         CHECK(f.firstObjectAddr(5) == 0);
+    }
+}
+
+TEST_CASE("SYSTEMB number of group objects has two octets", "[com_objects_systemb]")
+{
+    IAP_Init_Flash(0xff);
+    Fixture f;
+
+    SECTION("empty table")
+    {
+        CHECK(f.objectCount() == 0);
+    }
+
+    SECTION("less than 256 group objects")
+    {
+        f.setObjectCount(3);
+        CHECK(f.objectCount() == 3);
+    }
+
+    SECTION("256 and more group objects")
+    {
+        f.setObjectCount(300);
+        CHECK(f.objectCount() == 300);
     }
 }

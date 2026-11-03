@@ -316,7 +316,7 @@ protected:
     /**
      * @return The number of communication objects.
      */
-    int objectCount();
+    virtual int objectCount();
 
     /**
      * Find the first group address for the communication object. This is the
