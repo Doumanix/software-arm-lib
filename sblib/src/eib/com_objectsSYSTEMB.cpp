@@ -42,7 +42,7 @@ int ComObjectsSYSTEMB::objectSize(const int objno)
 uint8_t* ComObjectsSYSTEMB::objectValuePtr(const int objno)
 {
     int ramAddr = bcu->userRam->startAddr() + 2;
-    for (int i = 1; i < objno; i++)
+    for (int i = 0; i < objno; i++)
         ramAddr += objectSize(i);
     return ((BcuDefault*)bcu)->userMemoryPtr(ramAddr);
 }
@@ -69,6 +69,7 @@ void ComObjectsSYSTEMB::processGroupTelegram(const uint16_t addr, const int apci
     // Spec: Resources 4.11.4 Group Object Association Table - Realization Type 6
     //
     const ComConfig* configTab = &objectConfig(0);
+    const int numObjs = objectCount();
     const uint8_t* assocTab = bcu->addrTables->assocTable();
     const int endAssoc = 2 + makeWord(assocTab[0], assocTab[1]) * 4; // length field has 2 octets and each entry has 4 octets on SYSTEM B
 
@@ -85,8 +86,10 @@ void ComObjectsSYSTEMB::processGroupTelegram(const uint16_t addr, const int apci
         int gadest = makeWord(assocTab[idx], assocTab[idx + 1]); // get destination group address index
         if (gapos == gadest) // We found an association for our addr
         {
-            // Get the com-object number from the assoc table
-            const int objno = makeWord(assocTab[idx + 2], assocTab[idx + 3]);
+            // The association table holds the ASAP, which starts at 1, the object number of the application at 0
+            const int objno = makeWord(assocTab[idx + 2], assocTab[idx + 3]) - 1;
+            if ((objno < 0) || (objno >= numObjs))
+                continue; // ASAP not in the group object table
             if (objno == trg_objno)
                 continue; // no update of the object triggered by the app
 
@@ -124,7 +127,8 @@ int ComObjectsSYSTEMB::firstObjectAddr(const int objno) const
 
     for (int idx = 2; idx < endAssoc; idx += 4)
     {
-        if (makeWord(assocTab[idx + 2], assocTab[idx + 3]) != objno)
+        // The association table holds the ASAP, which starts at 1, the object number of the application at 0
+        if (makeWord(assocTab[idx + 2], assocTab[idx + 3]) != objno + 1)
         {
             continue;
         }
@@ -159,5 +163,5 @@ uint8_t* ComObjectsSYSTEMB::objectFlagsTable()
 
 inline const ComConfig& ComObjectsSYSTEMB::objectConfig(const int objno)
 {
-    return (*(const ComConfigSYSTEMB*) (objectConfigTable() + 2 + (objno - 1) * sizeof(ComConfigSYSTEMB))).baseConfig;
+    return (*(const ComConfigSYSTEMB*) (objectConfigTable() + 2 + objno * sizeof(ComConfigSYSTEMB))).baseConfig;
 }

@@ -79,6 +79,24 @@ namespace
 
         int objectCount() { return static_cast<ComObjectsProbe*>(bcu.comObjects)->objectCount(); }
 
+        // one octet per object value, objects with write and communication enabled
+        void setObjects(const int count)
+        {
+            setObjectCount(count);
+            for (int i = 0; i < count; ++i)
+            {
+                memory(ObjectTableAddress)[2 + i * 2] = COMCONF_WRITE_COMM;
+                memory(ObjectTableAddress)[3 + i * 2] = BYTE_1;
+            }
+        }
+
+        void receiveWrite(const int addr, const int value)
+        {
+            uint8_t telegram[9] = {};
+            telegram[8] = value;
+            bcu.comObjects->processGroupTelegram(addr, APCI_GROUP_VALUE_WRITE_PDU, telegram);
+        }
+
         int firstObjectAddr(const int objno)
         {
             return static_cast<ComObjectsProbe*>(bcu.comObjects)->firstObjectAddr(objno);
@@ -111,10 +129,10 @@ TEST_CASE("SYSTEMB first group address of a com object", "[com_objects_systemb]"
         f.putAssoc(3, 4, 7); // association behind the address table
 
         CHECK(f.bcu.addrTables->addrCount() == 3);
-        CHECK(f.firstObjectAddr(5) == 0x0802);
-        CHECK(f.firstObjectAddr(6) == 0x0803);
+        CHECK(f.firstObjectAddr(4) == 0x0802);
+        CHECK(f.firstObjectAddr(5) == 0x0803);
+        CHECK(f.firstObjectAddr(6) == 0);
         CHECK(f.firstObjectAddr(7) == 0);
-        CHECK(f.firstObjectAddr(8) == 0);
     }
 
     SECTION("256 and more group addresses")
@@ -133,10 +151,22 @@ TEST_CASE("SYSTEMB first group address of a com object", "[com_objects_systemb]"
         f.putAssoc(3, n + 1, 10); // association behind the address table
 
         CHECK(f.bcu.addrTables->addrCount() == n);
-        CHECK(f.firstObjectAddr(2) == 0x2001);
-        CHECK(f.firstObjectAddr(0x0103) == 0x2000 + 257);
-        CHECK(f.firstObjectAddr(9) == 0x2000 + n);
-        CHECK(f.firstObjectAddr(10) == 0);
+        CHECK(f.firstObjectAddr(1) == 0x2001);
+        CHECK(f.firstObjectAddr(0x0102) == 0x2000 + 257);
+        CHECK(f.firstObjectAddr(8) == 0x2000 + n);
+        CHECK(f.firstObjectAddr(9) == 0);
+    }
+
+    SECTION("ASAP starts at 1, the object number of the application at 0")
+    {
+        f.setAddressCount(2);
+        f.putAddress(1, 0x0801);
+        f.putAddress(2, 0x0802);
+        f.setAssocCount(2);
+        f.putAssoc(0, 1, 1);
+        f.putAssoc(1, 2, 0); // ASAP 0 does not exist
+        CHECK(f.firstObjectAddr(0) == 0x0801);
+        CHECK(f.firstObjectAddr(1) == 0);
     }
 
     SECTION("address table index zero is no group address")
@@ -145,7 +175,7 @@ TEST_CASE("SYSTEMB first group address of a com object", "[com_objects_systemb]"
         f.putAddress(1, 0x0801);
         f.setAssocCount(1);
         f.putAssoc(0, 0, 5);
-        CHECK(f.firstObjectAddr(5) == 0);
+        CHECK(f.firstObjectAddr(4) == 0);
     }
 }
 
@@ -169,5 +199,46 @@ TEST_CASE("SYSTEMB number of group objects has two octets", "[com_objects_system
     {
         f.setObjectCount(300);
         CHECK(f.objectCount() == 300);
+    }
+}
+
+TEST_CASE("SYSTEMB group telegram is assigned to the object number ASAP minus one", "[com_objects_systemb]")
+{
+    IAP_Init_Flash(0xff);
+    Fixture f;
+
+    f.setAddressCount(3);
+    f.putAddress(1, 0x0801);
+    f.putAddress(2, 0x0802);
+    f.putAddress(3, 0x0803);
+    f.setObjects(3);
+    f.setAssocCount(3);
+    f.putAssoc(0, 1, 1); // ASAP 1 is object 0
+    f.putAssoc(1, 2, 2);
+    f.putAssoc(2, 3, 3); // ASAP 3 is the last object
+
+    SECTION("first object")
+    {
+        f.receiveWrite(0x0801, 0x11);
+        CHECK(f.bcu.comObjects->objectRead(0) == 0x11);
+        CHECK(f.bcu.comObjects->objectRead(1) == 0);
+        CHECK(f.bcu.comObjects->objectRead(2) == 0);
+    }
+
+    SECTION("last object")
+    {
+        f.receiveWrite(0x0803, 0x33);
+        CHECK(f.bcu.comObjects->objectRead(0) == 0);
+        CHECK(f.bcu.comObjects->objectRead(1) == 0);
+        CHECK(f.bcu.comObjects->objectRead(2) == 0x33);
+    }
+
+    SECTION("ASAP behind the group object table is ignored")
+    {
+        f.putAssoc(2, 3, 4);
+        f.receiveWrite(0x0803, 0x33);
+        CHECK(f.bcu.comObjects->objectRead(0) == 0);
+        CHECK(f.bcu.comObjects->objectRead(1) == 0);
+        CHECK(f.bcu.comObjects->objectRead(2) == 0);
     }
 }
