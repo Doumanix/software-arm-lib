@@ -44,7 +44,9 @@ uint32_t ComObjectsSYSTEMB::objectValueAddr(const int objno)
     // The values of the group objects follow each other in the user RAM, there are no value pointers in the table
     uint32_t ramAddr = bcu->userRam->startAddr() + 2;
     for (int i = 0; i < objno; i++)
+    {
         ramAddr += objectSize(i);
+    }
     return (ramAddr);
 }
 
@@ -95,7 +97,9 @@ void ComObjectsSYSTEMB::processGroupTelegram(const uint16_t addr, const int apci
             // The association table holds the ASAP, which starts at 1, the object number of the application at 0
             const int objno = makeWord(assocTab[idx + 2], assocTab[idx + 3]) - 1;
             if ((objno < 0) || (objno >= numObjs))
+            {
                 continue; // ASAP not in the group object table
+            }
             if (objno == trg_objno)
                 continue; // no update of the object triggered by the app
 
