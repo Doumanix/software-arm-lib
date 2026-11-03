@@ -182,6 +182,7 @@
 
 #include <sblib/eib/addr_tables.h>
 #include <sblib/eib/knx_lpdu.h>
+#include <sblib/eib/knx_npdu.h>
 #include <sblib/eib/apci.h>
 #include <sblib/eib/property_types.h>
 #include <sblib/eib/bcu_base.h>
@@ -546,9 +547,9 @@ void ComObjects::processGroupWriteTelegram(const int objno, const uint8_t* tel)
     int count = telegramObjectSize(objno);
 
     if (count > 0)
-        reverseCopy(valuePtr, tel + 8, count);
+        reverseCopy(valuePtr, tel + telegramTpciIndex(tel) + 2, count);
     else
-        *valuePtr = tel[7] & 0x3f;
+        *valuePtr = tel[telegramTpciIndex(tel) + 1] & 0x3f;
 
     addObjectFlags(objno, COMFLAG_UPDATE);
 }
