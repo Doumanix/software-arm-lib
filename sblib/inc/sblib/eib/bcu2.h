@@ -121,6 +121,15 @@ public:
 
 protected:
     /**
+     * Tell if the individual address is stored in the address table, at the offset of the
+     * first address behind the 1 byte count. The table is then written by setOwnAddress() and
+     * read by begin() while the address table is loading.
+     *
+     * @return true if the individual address is part of the address table
+     */
+    virtual bool ownAddressInAddrTable() const { return true; }
+
+    /**
      * Processes @ref APCI_PROPERTY_VALUE_READ_PDU,
      *           @ref APCI_PROPERTY_VALUE_WRITE_PDU,
      *           @ref APCI_PROPERTY_DESCRIPTION_READ_PDU telegrams.

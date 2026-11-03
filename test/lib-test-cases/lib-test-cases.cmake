@@ -13,6 +13,8 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_bcu1_table_bounds.cpp
         src/test_addr_tables_bcu2.cpp
         src/test_addr_tables_mask07xx.cpp
+        src/test_com_objects_systemb.cpp
+        src/test_own_address_tables.cpp
         src/test_bootloader_commands.cpp
         src/test_datapoint_types.cpp
         src/test_digital_pin.cpp
@@ -23,6 +25,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_ioports.cpp
         src/test_ioports_get_pin_function_number.cpp
         src/test_knx_lpdu.cpp
+        src/test_knx_lpdu_frames.cpp
         src/test_mem_mapper.cpp
         src/test_platform.cpp
         src/test_print.cpp
@@ -37,6 +40,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_hashing_testcases.h
         src/knx/test_memory.h
         src/knx/test_memory.cpp
+        src/knx/test_memory_api.cpp
         src/knx/test_user_eeprom.h
         src/knx/test_user_eeprom.cpp
 )

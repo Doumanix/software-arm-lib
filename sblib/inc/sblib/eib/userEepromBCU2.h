@@ -57,6 +57,7 @@ private:
     ///\todo refactor PropertiesBCU2, so that it doesn't need to access private members of UserEepromBCU2,
     ///      then remove this friend declaration
     friend class PropertiesBCU2;
+    friend class PropertiesSYSTEMB;
 
     static constexpr uint32_t manufacturerHOffset = 0x03; //!< 0x0103: Software manufacturer high byte
     static constexpr uint32_t portADDROffset = 0x0c; //!< 0x010c: Port A DDR settings

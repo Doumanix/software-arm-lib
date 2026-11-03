@@ -21,6 +21,47 @@
 #include <sblib/eib/bus_debug.h>
 #include <sblib/eib/bcu_const.h>
 
+#if SBLIB_MAX_APDU_LENGTH > 15
+namespace
+{
+    /**
+     * @brief Check the control field and the length of a received frame (parity and checksum are correct).
+     * @details Standard frames up to 23 bytes as before. L_Data_Extended frames (KNX 3/2/2 2.2.5) only with
+     *          extended frame format 0000b and a length field below 255 that matches the received bytes.
+     *          A frame longer than the buffer was not stored completely (RX_LENGTH_ERROR): it is discarded
+     *          without acknowledge (KNX 3/2/2 2.4.2, 3/3/2 2.2.5).
+     * @param telegram The received bytes
+     * @param length   Number of received bytes including the checksum
+     * @param rxError  Error flags of the reception
+     * @return True if the frame is a data frame we may process
+     */
+    bool isValidDataFrame(const uint8_t* telegram, const uint16_t length, const uint16_t rxError)
+    {
+        if ((telegram[0] & VALID_ANY_DATA_FRAME_TYPE_MASK) != VALID_ANY_DATA_FRAME_TYPE_VALUE)
+        {
+            return false;
+        }
+
+        if (rxError & RX_LENGTH_ERROR)
+        {
+            return false;
+        }
+
+        if (!isExtendedFrame(telegram))
+        {
+            return length <= STANDARD_FRAME_MAX_SIZE;
+        }
+
+        if (length < 9 || lpduExtendedFrameFormat(telegram) != 0 || extendedFrameApduLength(telegram) == 0xff)
+        {
+            return false;
+        }
+
+        return length == extendedFrameLength(telegram) + 1;
+    }
+} // namespace
+#endif
+
 #if defined(SBLIB_RP2350_TIMER_STATS)
 #   include <hardware/timer.h>
 #   include <hardware/structs/watchdog.h>
@@ -257,7 +298,12 @@ bool Bus::canPause(const bool waitForTelegramSent) const
 
 void Bus::prepareTelegram(uint8_t* telegram, const uint16_t length) const
 {
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // Standard frame: octets 1/2, extended frame: octets 2/3
+    lpduSetSenderAddress(telegram, ownAddress);
+#else
     setSenderAddress(telegram, ownAddress);
+#endif
 
     // Calculate the checksum
     uint8_t checksum = 0xff;
@@ -283,6 +329,16 @@ void Bus::prepareTelegram(uint8_t* telegram, const uint16_t length) const
  */
 void Bus::sendTelegram(uint8_t* telegram, const uint16_t length)
 {
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // The frame and its checksum must fit into the telegram buffers (KNX 3/2/2 2.2.5)
+    if (length + 1 > TelegramBufferSize)
+    {
+        IF_DEBUG(fatalError());
+        callBack->finishedSendingTelegram(false);
+        return;
+    }
+#endif
+
     prepareTelegram(telegram, length);
 
     // Wait until there is space in the sending queue
@@ -452,6 +508,17 @@ void Bus::handleTelegram(const bool valid)
 #ifndef BUSMONITOR // no processing if we are in monitor mode
 
     // Received a valid telegram with correct checksum and valid control byte (normal data frame with preamble bits)?
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // Standard or extended frame, the length matches the length field
+    if (nextByteIndex >= 8 && valid && isValidDataFrame(rx_telegram, nextByteIndex, rx_error))
+    {
+        const int destAddr = lpduDestinationAddress(rx_telegram);
+        bool processTel = false;
+
+        // Only process the telegram if it is for us
+        if (lpduIsGroupAddress(rx_telegram)) // group address or physical address
+        {
+#else
     //todo extended tel, check tel len, give upper layer error info
     if (nextByteIndex >= 8 && valid && ((rx_telegram[0] & VALID_DATA_FRAME_TYPE_MASK) == VALID_DATA_FRAME_TYPE_VALUE)
         && nextByteIndex <= TelegramBufferSize)
@@ -462,6 +529,7 @@ void Bus::handleTelegram(const bool valid)
         // Only process the telegram if it is for us
         if (rx_telegram[5] & 0x80) // group address or physical address
         {
+#endif
             processTel = (destAddr == 0);                                                          // broadcast
             processTel |= (addressTable != nullptr) && (addressTable->indexOfAddr(destAddr) >= 0); // known group address
         }

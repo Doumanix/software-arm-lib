@@ -76,6 +76,14 @@ public:
 
     [[nodiscard]] uint8_t getUInt8(uint32_t address) const override;
     [[nodiscard]] uint16_t getUInt16(uint32_t address) const override;
+    [[nodiscard]] uint32_t getUInt32(uint32_t address) const override;
+    [[nodiscard]] bool read(uint32_t address, uint8_t* dst, uint32_t count) const override;
+
+    bool setUInt8(uint32_t address, uint8_t value) override;
+    bool setUInt16(uint32_t address, uint16_t value) override;
+    bool setUInt32(uint32_t address, uint32_t value) override;
+    bool write(uint32_t address, const uint8_t* src, uint32_t count) override;
+    bool fill(uint32_t address, uint32_t count, uint8_t value) override;
 
     void cpyFromUserRam(uint32_t address, unsigned char* buffer, uint32_t count) const;
     void cpyToUserRam(uint32_t address, const unsigned char* buffer, uint32_t count);

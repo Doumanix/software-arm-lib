@@ -125,11 +125,13 @@ TEST_CASE("SYSTEMB address table count excludes the individual address", "[addr_
 {
     TestAddrTablesSYSTEMB table;
 
-    SECTION("count zero is empty")
+    SECTION("count zero accepts all group addresses without an index")
     {
         table.bytes[0] = 0;
         table.bytes[1] = 0;
-        CHECK(table.indexOfAddr(0x1401) == -1);
+        putAddress(table.bytes.data() + 2, 0, 0x1401);
+        CHECK(table.indexOfAddr(0x1401) == 0);
+        CHECK(table.indexOfAddr(0x0064) == 0);
     }
 
     SECTION("count one holds one group address")
@@ -156,10 +158,13 @@ TEST_CASE("SYSTEMB address table count excludes the individual address", "[addr_
         CHECK(table.indexOfAddr(0xa55a) == -1);
     }
 
-    SECTION("address count keeps the 16 bit value")
+    SECTION("address count is the big endian 16 bit value")
     {
+        table.bytes[0] = 0x00;
+        table.bytes[1] = 0x03;
+        CHECK(table.addrCount() == 3);
         table.bytes[0] = 0x01;
         table.bytes[1] = 0x02;
-        CHECK(table.addrCount() == 0x0201);
+        CHECK(table.addrCount() == 0x0102);
     }
 }

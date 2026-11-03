@@ -266,6 +266,15 @@ void TLayer4::_begin()
 
 void TLayer4::processTelegram(unsigned char* telegram, const uint8_t telLength)
 {
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // The transport layer reads the octets of a standard frame. Until it knows the extended frame,
+    // received extended frames are discarded here.
+    if (isExtendedFrame(telegram))
+    {
+        discardReceivedTelegram();
+        return;
+    }
+#endif
     processTelegramInternal(telegram, telLength);
     discardReceivedTelegram();
 }

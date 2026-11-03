@@ -41,6 +41,20 @@ uint32_t Memory::size() const
     return (sizeTotal);
 }
 
+bool Memory::rangeValid(const uint32_t address, const uint32_t count) const
+{
+    if (count == 0)
+    {
+        return (true);
+    }
+    if (address < startAddress)
+    {
+        return (false);
+    }
+    const uint32_t offset = address - startAddress;
+    return ((offset < sizeTotal) && (count <= (sizeTotal - offset)));
+}
+
 bool Memory::inRange(const uint32_t address) const
 {
     return ((address >= startAddr()) && (address <= endAddr()));
