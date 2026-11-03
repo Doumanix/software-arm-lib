@@ -79,9 +79,9 @@ inline uint8_t sequenceNumber(const unsigned char* telegram)
 
 inline void setSequenceNumber(unsigned char* telegram, const uint8_t newSequenceNumber)
 {
-    telegram[TPDU_LOW_BYTE] &= static_cast<uint8_t>(~T_SEQUENCE_NUMBER_Msk);
-    telegram[TPDU_LOW_BYTE] |= static_cast<uint8_t>(newSequenceNumber << T_SEQUENCE_NUMBER_FIRST_BIT_Pos);
-    telegram[TPDU_LOW_BYTE] |= T_SEQUENCED_COMMAND; // set sequenced flag
+    telegram[telegramTpciIndex(telegram)] &= static_cast<uint8_t>(~T_SEQUENCE_NUMBER_Msk);
+    telegram[telegramTpciIndex(telegram)] |= static_cast<uint8_t>(newSequenceNumber << T_SEQUENCE_NUMBER_FIRST_BIT_Pos);
+    telegram[telegramTpciIndex(telegram)] |= T_SEQUENCED_COMMAND; // set sequenced flag
 }
 
 

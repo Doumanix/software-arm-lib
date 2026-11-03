@@ -565,7 +565,7 @@ void TLayer4::sendConControlTelegram(const TPDU cmd, const uint16_t address, con
     // sender address will be set by bus.sendTelegram()
     setDestinationAddress(sendBuffer, address);
     sendBuffer[5] = (uint8_t)0x60; ///\todo set correct routing counter
-    sendBuffer[6] = (uint8_t)cmd;
+    sendBuffer[telegramTpciIndex(sendBuffer)] = (uint8_t)cmd;
     if (cmd & T_SEQUENCED_COMMAND) // Add the sequence number if the command shall contain it
     {
         setSequenceNumber(sendBuffer, senderSeqNo);
@@ -616,7 +616,7 @@ void TLayer4::finishedSendingTelegram(const bool successful)
 {
     sendTelegramBufferState = TELEGRAM_FREE;
 
-    const auto tpci = sendTelegram[6] & 0xc3;                                       //0b11000011 Transport control field (see KNX 3/3/4 p.6 TPDU)
+    const auto tpci = sendTelegram[telegramTpciIndex(sendTelegram)] & 0xc3; //0b11000011 Transport control field (see KNX 3/3/4 p.6 TPDU)
     const auto isConnectionControlCommand = (tpci & T_CONNECTION_CTRL_COMMAND_Msk); // A connection control command
 
     if (isConnectionControlCommand)
