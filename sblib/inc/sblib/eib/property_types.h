@@ -130,6 +130,22 @@ struct PropertyDef
     uint8_t* valuePointer(BcuBase* bcu) const;
 
     /**
+     * Get the memory that holds the property value.
+     *
+     * @return The user RAM or user EEPROM if the property value is a pointer, nullptr if the
+     *         value is stored in valAddr itself.
+     */
+    Memory* valueMemory(BcuBase* bcu) const;
+
+    /**
+     * Get the address of the property value inside the memory returned by valueMemory().
+     * It can be used with the access functions of the memory, e.g. write() or setUInt8().
+     *
+     * @return The address of the property value, 0 if valueMemory() is nullptr.
+     */
+    uint32_t valueAddress(BcuBase* bcu) const;
+
+    /**
      * Test if the valuePointer() points to the userEeprom.
      *
      * @return True if it is an EEPROM pointer, false if not.

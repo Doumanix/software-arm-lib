@@ -59,3 +59,39 @@ uint8_t* PropertyDef::valuePointer(BcuBase* bcu) const
 
     return (uint8_t*) &valAddr;
 }
+
+Memory* PropertyDef::valueMemory(BcuBase* bcu) const
+{
+    Memory* memory = nullptr;
+
+    if (control & PC_POINTER)
+    {
+        switch (valAddr & PPT_MASK)
+        {
+            case PPT_USER_RAM:
+                memory = bcu->userRam;
+                break;
+            case PPT_USER_EEPROM:
+                memory = ((BcuDefault*)bcu)->userEeprom;
+                break;
+            default:
+                fatalError(); // invalid property pointer type encountered
+                break;
+        }
+    }
+
+    return memory;
+}
+
+uint32_t PropertyDef::valueAddress(BcuBase* bcu) const
+{
+    const Memory* memory = valueMemory(bcu);
+    uint32_t address = 0;
+
+    if (memory)
+    {
+        address = memory->startAddr() + (valAddr & PPT_OFFSET_MASK);
+    }
+
+    return address;
+}
