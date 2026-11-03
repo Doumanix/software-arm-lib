@@ -41,9 +41,11 @@ ApciCommand apciCommand(unsigned char* telegram)
 
 void setApciCommand(unsigned char* telegram, const ApciCommand newApciCommand, const uint8_t additionalData)
 {
-    telegram[telegramTpciIndex(telegram)] = HIGH_BYTE(newApciCommand);
-    telegram[telegramTpciIndex(telegram) + 1] = lowByte(newApciCommand);
-    telegram[telegramTpciIndex(telegram) + 1] |= additionalData;
+    // Send buffers are standard frames. The control field of a connected response is written
+    // after processApci(), so it can't select the octets here.
+    telegram[APCI_HIGH_BYTE] = HIGH_BYTE(newApciCommand);
+    telegram[APCI_LOW_BYTE] = lowByte(newApciCommand);
+    telegram[APCI_LOW_BYTE] |= additionalData;
 }
 
 /** @}*/
