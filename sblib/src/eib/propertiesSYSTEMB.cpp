@@ -325,18 +325,18 @@ bool PropertiesSYSTEMB::propertyValueReadTelegram(const int objectIdx, const Pro
     if (len > 12)
         return false; // length error
 
-    if (type < PDT_CHAR_BLOCK)
+    if (type == PDT_UNSIGNED_LONG)
     {
-        if (propertyId == PID_TABLE_REFERENCE)
-        {
-            sendBuffer[12] = 0;
-            sendBuffer[13] = 0;
-            reverseCopy(sendBuffer + 14, valuePtr + start * size, len);
-            len += 2;
-        }
-        else
-            reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
+        // the 4 byte value is backed by a 16 bit address in the EEPROM, the upper 16 bit are 0 (KNX 03_05_01 4.2.7)
+        if ((start != 0) || (count != 1))
+            return false; // only one element
+
+        sendBuffer[12] = 0;
+        sendBuffer[13] = 0;
+        reverseCopy(sendBuffer + 14, valuePtr, 2);
     }
+    else if (type < PDT_CHAR_BLOCK)
+        reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
     else
         memcpy(sendBuffer + 12, valuePtr + start * size, len);
 
