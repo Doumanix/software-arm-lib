@@ -37,6 +37,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_hashing_testcases.h
         src/knx/test_memory.h
         src/knx/test_memory.cpp
+        src/knx/test_memory_api.cpp
         src/knx/test_user_eeprom.h
         src/knx/test_user_eeprom.cpp
 )

@@ -145,5 +145,29 @@ uint16_t UserRam::getUInt16(uint32_t address) const
     return makeWord(userRamData[address], userRamData[address + 1]);
 }
 
+uint32_t UserRam::getUInt32(uint32_t address) const
+{
+    if (!rangeValid(address, 4))
+    {
+        return 0;
+    }
+    normalizeAddress(&address);
+    uint32_t value = makeWord(userRamData[address], userRamData[address + 1]);
+    value <<= 16;
+    value |= makeWord(userRamData[address + 2], userRamData[address + 3]);
+    return value;
+}
+
+bool UserRam::read(uint32_t address, uint8_t* dst, const uint32_t count) const
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    memcpy(dst, userRamData + address, count);
+    return true;
+}
+
 
 /** @}*/

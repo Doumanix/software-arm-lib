@@ -169,6 +169,30 @@ uint16_t UserEeprom::getUInt16(uint32_t address) const
     return makeWord(userEepromData[address], userEepromData[address + 1]);
 }
 
+uint32_t UserEeprom::getUInt32(uint32_t address) const
+{
+    if (!rangeValid(address, 4))
+    {
+        return 0;
+    }
+    normalizeAddress(&address);
+    uint32_t value = makeWord(userEepromData[address], userEepromData[address + 1]);
+    value <<= 16;
+    value |= makeWord(userEepromData[address + 2], userEepromData[address + 3]);
+    return value;
+}
+
+bool UserEeprom::read(uint32_t address, uint8_t* dst, const uint32_t count) const
+{
+    if (!rangeValid(address, count))
+    {
+        return false;
+    }
+    normalizeAddress(&address);
+    memcpy(dst, userEepromData + address, count);
+    return true;
+}
+
 void UserEeprom::modified(const bool newModified)
 {
     userEepromModified = newModified;

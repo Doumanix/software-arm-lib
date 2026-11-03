@@ -32,6 +32,8 @@ public:
 
     [[nodiscard]] uint8_t getUInt8([[maybe_unused]] uint32_t address) const override { return 0;}
     [[nodiscard]] uint16_t getUInt16([[maybe_unused]] uint32_t address) const override { return 0;}
+    [[nodiscard]] uint32_t getUInt32([[maybe_unused]] uint32_t address) const override { return 0;}
+    [[nodiscard]] bool read([[maybe_unused]] uint32_t address, [[maybe_unused]] uint8_t* dst, [[maybe_unused]] uint32_t count) const override { return false;}
 
 private:
     mutable uint8_t dummyByte = 0;

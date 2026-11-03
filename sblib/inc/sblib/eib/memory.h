@@ -70,6 +70,27 @@ public:
     [[nodiscard]] virtual uint16_t getUInt16(uint32_t address) const = 0;
 
     /**
+     * Gets a double word (big endian, like @ref getUInt16) from the memory at given @ref address up to address + 3
+     *
+     * @param address   Address to get the first byte from
+     * @return          Content as double word at the @ref address, 0 if the range is not accessible
+     * @note @ref startAddress will be subtracted from @ref address
+     */
+    [[nodiscard]] virtual uint32_t getUInt32(uint32_t address) const = 0;
+
+    /**
+     * Copies @ref count bytes from the memory at given @ref address to @ref dst
+     *
+     * @param address   Address of the first byte to copy
+     * @param dst       Destination buffer, must be at least @ref count bytes large
+     * @param count     Number of bytes to copy
+     * @return          True if the whole range is accessible and was copied, otherwise false
+     *                  and nothing is copied. Unlike @ref operator[] this does not end in fatalError().
+     * @note @ref startAddress will be subtracted from @ref address
+     */
+    [[nodiscard]] virtual bool read(uint32_t address, uint8_t* dst, uint32_t count) const = 0;
+
+    /**
      * Checks, if an @ref address is accessible in the memory
      *
      * @param address   Address to check for valid access
@@ -108,6 +129,15 @@ public:
     [[nodiscard]] uint32_t size() const;
 
 protected:
+    /**
+     * Checks, if @ref count bytes starting at @ref address (absolute, not yet normalized) are accessible
+     *
+     * @param address   Address of the first byte
+     * @param count     Number of bytes
+     * @return          True if all bytes are accessible, overflow safe. An empty range is always valid.
+     */
+    [[nodiscard]] bool rangeValid(uint32_t address, uint32_t count) const;
+
     uint32_t startAddress; //!< virtual start address of the memory
     uint32_t endAddress;   //!< virtual end address of the memory
     uint32_t sizeTotal;    //!< size in bytes of the memory
