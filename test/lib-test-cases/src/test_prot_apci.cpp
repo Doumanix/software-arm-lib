@@ -185,6 +185,32 @@ static Telegram apciPropertyDescriptionReadTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
+// SYSTEM B has fixed interface object indices, index 3 is the group object table without PID_PROGRAM_VERSION,
+// the application program 1 object is at index 4
+static Telegram apciPropertyDescriptionReadTelegrams_SystemB[] =
+{
+    // 1. T_CONNECT_PDU (0x80) from sourceAddr=10.0.1 to destAddr=10.0.0
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}},
+    // 2. APCI_PROPERTY_DESCRIPTION_READ_PDU, objIdx = 0x00 (device) , propId = 0x0C (PID_MANUFACTURER_ID), index = 0x00
+    {TEL_RX, 11, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, 0x43, 0xD8, 0x00, 0x0C, 0x00}},
+    // 3. Check T_ACK, loop() once so APCI_PROPERTY_DESCRIPTION_RESPONSE_PDU will be send
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+    // 4. APCI_PROPERTY_DESCRIPTION_RESPONSE_PDU
+    {TEL_TX, 15, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x68, 0x43, 0xD9, 0x00, 0x0C, 0x00, 0x12, 0x00, 0x01, 0x50}},
+    // 5. T_ACK for APCI_PROPERTY_DESCRIPTION_RESPONSE_PDU
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0xC2}},
+    // 6. APCI_PROPERTY_DESCRIPTION_READ_PDU, objIdx = 0x04 (application program 1) , propId = 0x0D (PID_PROG_VERSION), index = 0x00
+    {TEL_RX, 11, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, 0x47, 0xD8, 0x04, 0x0D, 0x00}},
+    // 7. Check T_ACK, loop() once so APCI_PROPERTY_DESCRIPTION_RESPONSE_PDU will be send
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC6}},
+    // 8. APCI_PROPERTY_DESCRIPTION_RESPONSE_PDU, writable, one element
+    {TEL_TX, 15, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x68, 0x47, 0xD9, 0x04, 0x0D, 0x00, 0x95, 0x00, 0x01, 0xF1}},
+    // 9. T_ACK for APCI_PROPERTY_DESCRIPTION_RESPONSE_PDU
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0xC6}},
+    // 10.
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
 static Telegram apciPropertyValueReadTelegrams_BCU1[] =
 {   // special BCU 1 version, which should not respond
     // 1. T_CONNECT_PDU (0x80) from sourceAddr=10.0.1 to destAddr=10.0.0
@@ -221,6 +247,22 @@ static Telegram apciPropertyValueReadTelegrams[] =
     // 9. T_ACK for APCI_PROPERTY_VALUE_RESPONSE_PDU
     {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0xC6}},
     // 10.
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+static Telegram apciPropertyValueReadTelegrams_SystemB[] =
+{
+    // 1. T_CONNECT_PDU (0x80) from sourceAddr=10.0.1 to destAddr=10.0.0
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}},
+    // 2. APCI_PROPERTY_VALUE_READ_PDU, objIdx = 0x00 (device) , propId = 0x0C (PID_MANUFACTURER_ID), count = 1, start = 1
+    {TEL_RX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, 0x43, 0xD5, 0x00, 0x0C, 0x10, 0x01}},
+    // 3. Check T_ACK, loop() once so APCI_PROPERTY_VALUE_RESPONSE_PDU will be send
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+    // 4. APCI_PROPERTY_VALUE_RESPONSE_PDU (Manufacturer)
+    {TEL_TX, 14, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x67, 0x43, 0xD6, 0x00, 0x0C, 0x10, 0x01, (MANUFACTURER >> 8), (MANUFACTURER & 0xFF)}},
+    // 5. T_ACK for APCI_PROPERTY_VALUE_RESPONSE_PDU
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0xC2}},
+    // 6.
     {END, 0, 0, 0, nullptr, {0}}
 };
 
@@ -478,6 +520,8 @@ TEST_CASE("APCI processing", "[protocol][APCI]")
 
     SECTION("BCU 0x07B0") {
         bcuTypeToTest = BCU_07B0;
+        testCaseApciPropertyDescriptionReadPdu.telegram = apciPropertyDescriptionReadTelegrams_SystemB;
+        testCaseApciPropertyValueReadPdu.telegram = apciPropertyValueReadTelegrams_SystemB;
         executeTest(bcuTypeToTest, &testCaseApciAdcReadPdu);
         executeTest(bcuTypeToTest, &testCaseApciMemoryReadPdu);
         executeTest(bcuTypeToTest, &testCaseApciMemoryWritePdu);

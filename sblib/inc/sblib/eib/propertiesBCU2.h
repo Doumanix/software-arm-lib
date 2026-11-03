@@ -441,6 +441,7 @@ protected:
 private:
     BCU2* bcu;
 
+protected:
     /**
      * The properties of the device object
      * See KNX Spec 06 Profiles/Annex A p.103 and 9/4/1 p.50
