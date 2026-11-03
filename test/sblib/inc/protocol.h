@@ -88,7 +88,7 @@ struct Telegram // adding something to Telegram also requires extension of funct
     unsigned int     loopCount;
     unsigned int     variable;
     StepFunction   * stepFunction;
-    unsigned char    bytes[24]; ///\todo more space for extended frames
+    unsigned char    bytes[32]; ///\todo more space for long extended frames
 };
 
 typedef void (TestCaseSetup) (Telegram* tel, uint16_t telCount);
@@ -114,6 +114,7 @@ struct Test_Case
 };
 
 void executeTest(BcuType testBcuType, Test_Case * tc);
+void executeTestOnBcu(BcuDefault* currentBcu, Test_Case* tc);
 void telegramPreparation(BcuDefault* testBcu, Telegram* tel, uint16_t telCount);
 
 #endif /* PROTOCOL_H_ */

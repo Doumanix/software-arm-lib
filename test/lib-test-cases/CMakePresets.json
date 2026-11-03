@@ -41,6 +41,18 @@
             }
         },
         {
+            "name": "x64_lf254",
+            "displayName": "x64 L_Data_Extended Target",
+            "description": "x64 with SBLIB_MAX_APDU_LENGTH 254 (extended frames)",
+            "hidden": false,
+            "inherits": [
+                "x64"
+            ],
+            "cacheVariables": {
+                "SBLIB_MAX_APDU_LENGTH": "254"
+            }
+        },
+        {
             "name": "x86_logging",
             "displayName": "x86 logging Target",
             "description": "Most of logging enabled",
