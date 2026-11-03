@@ -39,12 +39,18 @@ int ComObjectsSYSTEMB::objectSize(const int objno)
     return 252;
 }
 
-uint8_t* ComObjectsSYSTEMB::objectValuePtr(const int objno)
+uint32_t ComObjectsSYSTEMB::objectValueAddr(const int objno)
 {
-    int ramAddr = bcu->userRam->startAddr() + 2;
+    // The values of the group objects follow each other in the user RAM, there are no value pointers in the table
+    uint32_t ramAddr = bcu->userRam->startAddr() + 2;
     for (int i = 0; i < objno; i++)
         ramAddr += objectSize(i);
-    return ((BcuDefault*)bcu)->userMemoryPtr(ramAddr);
+    return (ramAddr);
+}
+
+uint8_t* ComObjectsSYSTEMB::objectValuePtr(const int objno)
+{
+    return ((BcuDefault*)bcu)->userMemoryPtr(objectValueAddr(objno));
 }
 
 /*
@@ -154,11 +160,21 @@ uint8_t* ComObjectsSYSTEMB::objectConfigTable()
 
 uint8_t* ComObjectsSYSTEMB::objectFlagsTable()
 {
-    const uint8_t* configTable = objectConfigTable();
-    if (le_ptr == LITTLE_ENDIAN)
-        return ((BcuDefault*)bcu)->userMemoryPtr(makeWord(configTable[2], configTable[1]));
+    // The group object table has no pointer to the RAM flags, they are placed in the user RAM directly behind the
+    // values, one nibble per group object
+    const int numObjs = objectCount();
+    if (numObjs == 0)
+    {
+        return (nullptr);
+    }
 
-    return ((BcuDefault*)bcu)->userMemoryPtr(makeWord(configTable[1], configTable[2]));
+    const uint32_t flagsAddr = objectValueAddr(numObjs);
+    const uint32_t flagsEnd = flagsAddr + (numObjs + 1) / 2 - 1;
+    if (flagsEnd > bcu->userRam->endAddr())
+    {
+        return (nullptr);
+    }
+    return ((BcuDefault*)bcu)->userMemoryPtr(flagsAddr);
 }
 
 inline const ComConfig& ComObjectsSYSTEMB::objectConfig(const int objno)

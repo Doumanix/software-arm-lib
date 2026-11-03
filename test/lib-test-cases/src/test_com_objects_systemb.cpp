@@ -17,7 +17,7 @@ namespace
 {
     constexpr uint16_t AddrTableAddress = 0x3400;
     constexpr uint16_t AssocTableAddress = 0x3800;
-    constexpr uint16_t ObjectTableAddress = 0x3c00;
+    constexpr uint16_t ObjectTableAddress = 0x3900;
 
     class ComObjectsProbe final : public ComObjectsSYSTEMB
     {
@@ -79,13 +79,13 @@ namespace
 
         int objectCount() { return static_cast<ComObjectsProbe*>(bcu.comObjects)->objectCount(); }
 
-        // one octet per object value, objects with write and communication enabled
+        // one octet per object value, objects with transmit, write and communication enabled
         void setObjects(const int count)
         {
             setObjectCount(count);
             for (int i = 0; i < count; ++i)
             {
-                memory(ObjectTableAddress)[2 + i * 2] = COMCONF_WRITE_COMM;
+                memory(ObjectTableAddress)[2 + i * 2] = COMCONF_TRANS | COMCONF_WRITE_COMM;
                 memory(ObjectTableAddress)[3 + i * 2] = BYTE_1;
             }
         }
@@ -240,5 +240,66 @@ TEST_CASE("SYSTEMB group telegram is assigned to the object number ASAP minus on
         CHECK(f.bcu.comObjects->objectRead(0) == 0);
         CHECK(f.bcu.comObjects->objectRead(1) == 0);
         CHECK(f.bcu.comObjects->objectRead(2) == 0);
+    }
+}
+
+TEST_CASE("SYSTEMB RAM flags of the group objects", "[com_objects_systemb]")
+{
+    IAP_Init_Flash(0xff);
+    Fixture f;
+
+    f.setAddressCount(2);
+    f.putAddress(1, 0x0801);
+    f.putAddress(2, 0x0802);
+    f.setObjects(3);
+    f.setAssocCount(2);
+    f.putAssoc(0, 1, 1);
+    f.putAssoc(1, 2, 3);
+
+    const uint8_t* flags = f.bcu.comObjects->objectFlagsTable();
+    uint8_t* valueEnd = f.bcu.comObjects->objectValuePtr(3);
+
+    SECTION("the flags follow the values and start cleared")
+    {
+        REQUIRE(flags != nullptr);
+        CHECK(flags == valueEnd);
+        CHECK(flags[0] == 0);
+        CHECK(flags[1] == 0);
+    }
+
+    SECTION("objectWrite sets the transmit request and the first group address is sent")
+    {
+        f.bcu.comObjects->objectWrite(0, 0x5a);
+        CHECK((flags[0] & 0x0f) == COMFLAG_TRANSREQ);
+        CHECK((flags[0] & 0xf0) == 0);
+
+        CHECK(f.bcu.comObjects->sendNextGroupTelegram());
+        CHECK(f.bcu.bus->sendCurTelegram[3] == 0x08);
+        CHECK(f.bcu.bus->sendCurTelegram[4] == 0x01);
+        CHECK((flags[0] & COMFLAG_TRANS_MASK) == COMFLAG_ERROR);
+    }
+
+    SECTION("the odd object uses the high nibble")
+    {
+        f.bcu.comObjects->objectWrite(2, 0x5a);
+        CHECK(flags[0] == 0);
+        CHECK((flags[1] & 0x0f) == COMFLAG_TRANSREQ);
+    }
+
+    SECTION("a received group telegram sets the update flag")
+    {
+        f.receiveWrite(0x0802, 0x77);
+        CHECK(f.bcu.comObjects->objectRead(2) == 0x77);
+        CHECK(f.bcu.comObjects->nextUpdatedObject() == 2);
+        CHECK(f.bcu.comObjects->nextUpdatedObject() == INVALID_OBJECT_NUMBER);
+    }
+
+    SECTION("too many group objects for the user RAM have no flags")
+    {
+        f.setObjects(520); // 520 values and 260 flag octets do not fit into 770 octets
+        CHECK(f.bcu.comObjects->objectFlagsTable() == nullptr);
+        CHECK(f.bcu.comObjects->nextUpdatedObject() == INVALID_OBJECT_NUMBER);
+        f.bcu.comObjects->objectWrite(0, 1);
+        CHECK(f.bcu.comObjects->objectRead(0) == 1);
     }
 }
