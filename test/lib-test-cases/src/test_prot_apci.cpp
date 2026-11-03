@@ -405,6 +405,93 @@ static Test_Case testCaseApciPropertyValueWritePdu =
     apciPropertyValueWriteTelegrams
 };
 
+static void tc_setupVerifyMode(Telegram* tel, uint16_t telCount)
+{
+    tc_setup(tel, telCount);
+    bcuUnderTest->userRam->deviceControl() |= DEVCTRL_MEM_AUTO_RESPONSE;
+}
+
+// APCI_MEMORY_READ_PDU with number > 12 does not fit into an APDU: response with number 0 and the requested address
+#define MEMORY_READ_TOO_MANY(NUMBER) \
+static Telegram apciMemoryReadNumber##NUMBER##Telegrams[] = \
+{ \
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}}, \
+    {TEL_RX, 10, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x64, 0x42, NUMBER, 0x01, 0x05}}, \
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}}, \
+    {TEL_TX, 10, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x63, 0x42, 0x40, 0x01, 0x05}}, \
+    {END, 0, 0, 0, nullptr, {0}} \
+}
+
+MEMORY_READ_TOO_MANY(0x0D);
+MEMORY_READ_TOO_MANY(0x0E);
+MEMORY_READ_TOO_MANY(0x0F);
+
+static Telegram apciMemoryWriteTooShortTelegrams[] =
+{
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}},
+    // number = 2, but only one data octet: ignored, no response
+    {TEL_RX, 11, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x64, 0x42, 0x82, 0x01, 0x05, 0xCD}},
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+    // the memory is unchanged
+    {TEL_RX, 10, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x64, 0x46, 0x02, 0x01, 0x05}},
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC6}},
+    {TEL_TX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x65, 0x42, 0x42, 0x01, 0x05, 0x20, 0x60}},
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+static Telegram apciMemoryWriteTooLongTelegrams[] =
+{
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}},
+    // number = 1, but two data octets: ignored, no response
+    {TEL_RX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x65, 0x42, 0x81, 0x01, 0x05, 0xCD, 0xEF}},
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+    {TEL_RX, 10, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x64, 0x46, 0x02, 0x01, 0x05}},
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC6}},
+    {TEL_TX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x65, 0x42, 0x42, 0x01, 0x05, 0x20, 0x60}},
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+static Telegram apciMemoryWriteVerifyModeOkTelegrams[] =
+{
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}},
+    {TEL_RX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x66, 0x42, 0x82, 0x01, 0x05, 0xCD, 0xEF}},
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+    // successful write: response with the written data
+    {TEL_TX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x65, 0x42, 0x42, 0x01, 0x05, 0xCD, 0xEF}},
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+static Telegram apciMemoryWriteVerifyModeFailedTelegrams[] =
+{
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}},
+    // address 0xFFF0 is not reachable
+    {TEL_RX, 11, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x64, 0x42, 0x81, 0xFF, 0xF0, 0xAA}},
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+    // failed write: response with number 0
+    {TEL_TX, 10, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x63, 0x42, 0x40, 0xFF, 0xF0}},
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+static Telegram apciMemoryWriteVerifyModeInactiveFailedTelegrams[] =
+{
+    {TEL_RX,  7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}},
+    {TEL_RX, 11, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x64, 0x42, 0x81, 0xFF, 0xF0, 0xAA}},
+    {TEL_TX,  7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+#define MEMORY_TEST_CASE(NAME, SETUP, TELEGRAMS) \
+static Test_Case NAME = {#NAME, MANUFACTURER, DEVICE, VERSION, 0, NULL, SETUP, NULL, NULL, NULL, TELEGRAMS}
+
+MEMORY_TEST_CASE(testCaseMemoryReadNumber13, tc_setup, apciMemoryReadNumber0x0DTelegrams);
+MEMORY_TEST_CASE(testCaseMemoryReadNumber14, tc_setup, apciMemoryReadNumber0x0ETelegrams);
+MEMORY_TEST_CASE(testCaseMemoryReadNumber15, tc_setup, apciMemoryReadNumber0x0FTelegrams);
+MEMORY_TEST_CASE(testCaseMemoryWriteTooShort, tc_setup, apciMemoryWriteTooShortTelegrams);
+MEMORY_TEST_CASE(testCaseMemoryWriteTooLong, tc_setup, apciMemoryWriteTooLongTelegrams);
+MEMORY_TEST_CASE(testCaseMemoryWriteVerifyModeOk, tc_setupVerifyMode, apciMemoryWriteVerifyModeOkTelegrams);
+MEMORY_TEST_CASE(testCaseMemoryWriteVerifyModeFailed, tc_setupVerifyMode, apciMemoryWriteVerifyModeFailedTelegrams);
+MEMORY_TEST_CASE(testCaseMemoryWriteVerifyModeInactiveFailed, tc_setup, apciMemoryWriteVerifyModeInactiveFailedTelegrams);
+
 TEST_CASE("APCI processing", "[protocol][APCI]")
 {
     BcuType bcuTypeToTest;
@@ -493,3 +580,33 @@ TEST_CASE("APCI processing", "[protocol][APCI]")
     }
 }
 
+
+TEST_CASE("APCI memory services handle invalid parameters", "[protocol][APCI][apci-memory]")
+{
+    BcuType bcuTypeToTest = BCU_1;
+    SECTION("BCU 1") {
+        bcuTypeToTest = BCU_1;
+    }
+    SECTION("BCU 2") {
+        bcuTypeToTest = BCU_2;
+    }
+    SECTION("BCU 0x0701 (BIM112)") {
+        bcuTypeToTest = BCU_0701;
+    }
+    SECTION("BCU 0x0705 (BIM112)") {
+        bcuTypeToTest = BCU_0705;
+    }
+
+    executeTest(bcuTypeToTest, &testCaseMemoryReadNumber13);
+    executeTest(bcuTypeToTest, &testCaseMemoryReadNumber14);
+    executeTest(bcuTypeToTest, &testCaseMemoryReadNumber15);
+    executeTest(bcuTypeToTest, &testCaseMemoryWriteTooShort);
+    executeTest(bcuTypeToTest, &testCaseMemoryWriteTooLong);
+    if (bcuTypeToTest != BCU_1)
+    {
+        // Verify Mode is not available for BCU 1
+        executeTest(bcuTypeToTest, &testCaseMemoryWriteVerifyModeOk);
+        executeTest(bcuTypeToTest, &testCaseMemoryWriteVerifyModeFailed);
+    }
+    executeTest(bcuTypeToTest, &testCaseMemoryWriteVerifyModeInactiveFailed);
+}

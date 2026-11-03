@@ -466,19 +466,39 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
 
             if (apciCmd == APCI_MEMORY_WRITE_PDU)
             {
+                if ((telLength - 10 - 1) != count) // telLength includes the checksum
+                {
+                    // number does not match the telegram length, ignore the telegram
+                    return (false);
+                }
+
+                ///\todo dirty workaround, should be done in subclasses BCU1, MASKVERSION701, MASKVERSION705...
+                const bool autoResponse =
+                        (getMaskVersion() > 0x1F) && (userRam->deviceControl() & DEVCTRL_MEM_AUTO_RESPONSE);
                 if (processApciMemoryWritePDU(address, &telegram[10], count))
                 {
-                    ///\todo dirty workaround, should be done in subclasses BCU1, MASKVERSION701, MASKVERSION705...
-                    if ((getMaskVersion() > 0x1F) && (userRam->deviceControl() & DEVCTRL_MEM_AUTO_RESPONSE))
+                    if (autoResponse)
                     {
-                        // autorespond only on successful write
+                        // autorespond on successful write
                         apciCmd = APCI_MEMORY_READ_PDU;
                     }
+                }
+                else if (autoResponse)
+                {
+                    // autorespond on failed write with number 0
+                    count = 0;
+                    apciCmd = APCI_MEMORY_READ_PDU;
                 }
             }
 
             if (apciCmd == APCI_MEMORY_READ_PDU)
             {
+                if (count > 12)
+                {
+                    // number exceeds the maximum APDU length, respond with number 0
+                    count = 0;
+                }
+
                 if (!processApciMemoryReadPDU(address, &sendBuffer[10], count))
                 {
                     // address space unreachable, need to respond with count 0
