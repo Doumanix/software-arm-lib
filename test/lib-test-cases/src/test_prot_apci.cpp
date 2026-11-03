@@ -304,6 +304,99 @@ static Telegram apciPropertyValueWriteTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
+// SYSTEM B: building blocks for one connected property exchange (request, T_ACK, response, T_ACK) with sequence number seq
+#define TPCI_DATA(seq) (0x43 + 4 * (seq))
+#define TPCI_ACK(seq) (0xC2 + 4 * (seq))
+#define TEL_ACK_TX(seq) {TEL_TX, 7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, TPCI_ACK(seq)}}
+#define TEL_ACK_RX(seq) {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, TPCI_ACK(seq)}}
+#define TEL_CONNECT {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}}
+
+#define TEL_DESC_READ(seq, obj, pid) \
+    {TEL_RX, 11, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD8, obj, pid, 0x00}}, \
+    TEL_ACK_TX(seq)
+#define TEL_DESC_RESPONSE(seq, obj, pid, type, elems, access) \
+    {TEL_TX, 15, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x68, TPCI_DATA(seq), 0xD9, obj, pid, 0x00, type, 0x00, elems, access}}, \
+    TEL_ACK_RX(seq)
+
+#define TEL_VALUE_READ(seq, obj, pid) \
+    {TEL_RX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD5, obj, pid, 0x10, 0x01}}, \
+    TEL_ACK_TX(seq)
+#define TEL_VALUE_WRITE_1(seq, obj, pid, d0) \
+    {TEL_RX, 13, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD7, obj, pid, 0x10, 0x01, d0}}, \
+    TEL_ACK_TX(seq)
+#define TEL_VALUE_WRITE_5(seq, obj, pid, d0, d1, d2, d3, d4) \
+    {TEL_RX, 17, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD7, obj, pid, 0x10, 0x01, d0, d1, d2, d3, d4}}, \
+    TEL_ACK_TX(seq)
+#define TEL_VALUE_RESPONSE_1(seq, obj, pid, d0) \
+    {TEL_TX, 13, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x66, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0}}, \
+    TEL_ACK_RX(seq)
+#define TEL_VALUE_RESPONSE_2(seq, obj, pid, d0, d1) \
+    {TEL_TX, 14, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x67, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0, d1}}, \
+    TEL_ACK_RX(seq)
+#define TEL_VALUE_RESPONSE_4(seq, obj, pid, d0, d1, d2, d3) \
+    {TEL_TX, 16, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x69, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0, d1, d2, d3}}, \
+    TEL_ACK_RX(seq)
+#define TEL_VALUE_RESPONSE_5(seq, obj, pid, d0, d1, d2, d3, d4) \
+    {TEL_TX, 17, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x6A, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0, d1, d2, d3, d4}}, \
+    TEL_ACK_RX(seq)
+
+static void setSystemBTableAddresses([[maybe_unused]] void* state, [[maybe_unused]] unsigned int var)
+{
+    UserEepromBCU2* eeprom = static_cast<UserEepromBCU2*>(bcuUnderTest->userEeprom);
+    eeprom->addrTabAddr() = 0x3456;
+    eeprom->assocTabAddr() = 0x3458;
+    eeprom->commsTabAddr() = 0x3500;
+    eeprom->eibObjAddr() = 0x3600;
+    eeprom->commsSeg0Addr() = 0x3700;
+}
+
+// objects 0..5 report their object type, object 6 does not exist
+static Telegram apciSystemBObjectTypeTelegrams[] =
+{
+    TEL_CONNECT,
+    TEL_VALUE_READ(0, 0, 0x01), TEL_VALUE_RESPONSE_2(0, 0, 0x01, 0x00, 0x00),
+    TEL_VALUE_READ(1, 1, 0x01), TEL_VALUE_RESPONSE_2(1, 1, 0x01, 0x00, 0x01),
+    TEL_VALUE_READ(2, 2, 0x01), TEL_VALUE_RESPONSE_2(2, 2, 0x01, 0x00, 0x02),
+    TEL_VALUE_READ(3, 3, 0x01), TEL_VALUE_RESPONSE_2(3, 3, 0x01, 0x00, 0x09),
+    TEL_VALUE_READ(4, 4, 0x01), TEL_VALUE_RESPONSE_2(4, 4, 0x01, 0x00, 0x03),
+    TEL_VALUE_READ(5, 5, 0x01), TEL_VALUE_RESPONSE_2(5, 5, 0x01, 0x00, 0x04),
+    // object 6 does not exist: description with 0 elements
+    TEL_DESC_READ(6, 6, 0x01), TEL_DESC_RESPONSE(6, 6, 0x01, 0x00, 0x00, 0x00),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+// PID_TABLE_REFERENCE is a 4 byte value, the upper two bytes are 0
+static Telegram apciSystemBTableReferenceTelegrams[] =
+{
+    {TEL_RX, 7, 0, 0, setSystemBTableAddresses, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}},
+    TEL_DESC_READ(0, 1, 0x07), TEL_DESC_RESPONSE(0, 1, 0x07, 0x09, 0x01, 0x50),
+    TEL_VALUE_READ(1, 1, 0x07), TEL_VALUE_RESPONSE_4(1, 1, 0x07, 0x00, 0x00, 0x34, 0x56),
+    TEL_VALUE_READ(2, 2, 0x07), TEL_VALUE_RESPONSE_4(2, 2, 0x07, 0x00, 0x00, 0x34, 0x58),
+    TEL_VALUE_READ(3, 3, 0x07), TEL_VALUE_RESPONSE_4(3, 3, 0x07, 0x00, 0x00, 0x35, 0x00),
+    TEL_VALUE_READ(4, 4, 0x07), TEL_VALUE_RESPONSE_4(4, 4, 0x07, 0x00, 0x00, 0x36, 0x00),
+    TEL_VALUE_READ(5, 5, 0x07), TEL_VALUE_RESPONSE_4(5, 5, 0x07, 0x00, 0x00, 0x37, 0x00),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+// PID_PROGRAM_VERSION and PID_PEI_TYPE of the application programs 1 and 2 can be written and read back,
+// the load state of object 5 is "unloaded" after a reset
+static Telegram apciSystemBApplicationTelegrams[] =
+{
+    TEL_CONNECT,
+    TEL_VALUE_READ(0, 5, 0x05), TEL_VALUE_RESPONSE_1(0, 5, 0x05, 0x00),
+    TEL_VALUE_WRITE_5(1, 4, 0x0D, 0x00, 0x04, 0x20, 0x60, 0x01),
+    TEL_VALUE_RESPONSE_5(1, 4, 0x0D, 0x00, 0x04, 0x20, 0x60, 0x01),
+    TEL_VALUE_WRITE_5(2, 5, 0x0D, 0x00, 0x04, 0x20, 0x61, 0x02),
+    TEL_VALUE_RESPONSE_5(2, 5, 0x0D, 0x00, 0x04, 0x20, 0x61, 0x02),
+    TEL_VALUE_READ(3, 4, 0x0D), TEL_VALUE_RESPONSE_5(3, 4, 0x0D, 0x00, 0x04, 0x20, 0x60, 0x01),
+    TEL_VALUE_READ(4, 5, 0x0D), TEL_VALUE_RESPONSE_5(4, 5, 0x0D, 0x00, 0x04, 0x20, 0x61, 0x02),
+    TEL_VALUE_WRITE_1(5, 4, 0x10, 0x01), TEL_VALUE_RESPONSE_1(5, 4, 0x10, 0x01),
+    TEL_VALUE_WRITE_1(6, 5, 0x10, 0x02), TEL_VALUE_RESPONSE_1(6, 5, 0x10, 0x02),
+    TEL_VALUE_READ(7, 4, 0x10), TEL_VALUE_RESPONSE_1(7, 4, 0x10, 0x01),
+    TEL_VALUE_READ(8, 5, 0x10), TEL_VALUE_RESPONSE_1(8, 5, 0x10, 0x02),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
 static Test_Case testCaseApciAdcReadPdu =
 {
     "APCI_ADC_READ_PDU",
@@ -447,6 +540,45 @@ static Test_Case testCaseApciPropertyValueWritePdu =
     apciPropertyValueWriteTelegrams
 };
 
+static Test_Case testCaseApciSystemBObjectType =
+{
+    "APCI_PROPERTY SYSTEM B object types",
+    MANUFACTURER, DEVICE, VERSION,
+    0,    //powerOnDelay
+    NULL, // eePromSetup
+    tc_setup,
+    NULL,
+    NULL,
+    NULL,
+    apciSystemBObjectTypeTelegrams
+};
+
+static Test_Case testCaseApciSystemBTableReference =
+{
+    "APCI_PROPERTY SYSTEM B table reference",
+    MANUFACTURER, DEVICE, VERSION,
+    0,    //powerOnDelay
+    NULL, // eePromSetup
+    tc_setup,
+    NULL,
+    NULL,
+    NULL,
+    apciSystemBTableReferenceTelegrams
+};
+
+static Test_Case testCaseApciSystemBApplication =
+{
+    "APCI_PROPERTY SYSTEM B application programs",
+    MANUFACTURER, DEVICE, VERSION,
+    0,    //powerOnDelay
+    NULL, // eePromSetup
+    tc_setup,
+    NULL,
+    NULL,
+    NULL,
+    apciSystemBApplicationTelegrams
+};
+
 TEST_CASE("APCI processing", "[protocol][APCI]")
 {
     BcuType bcuTypeToTest;
@@ -532,8 +664,10 @@ TEST_CASE("APCI processing", "[protocol][APCI]")
         executeTest(bcuTypeToTest, &testCaseApciAuthorizeRequestPdu);
         executeTest(bcuTypeToTest, &testCaseApciPropertyDescriptionReadPdu);
         executeTest(bcuTypeToTest, &testCaseApciPropertyValueReadPdu);
-        ///\todo fails for SYSTEMB
-        // executeTest(bcuTypeToTest, &testCaseApciPropertyValueWritePdu);
+        executeTest(bcuTypeToTest, &testCaseApciPropertyValueWritePdu);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBObjectType);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBTableReference);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBApplication);
     }
 }
 
