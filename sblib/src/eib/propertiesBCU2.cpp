@@ -127,22 +127,22 @@ LoadState PropertiesBCU2::handleAllocAbsTaskSegment(const int objectIdx, const u
     switch (objectIdx)
     {
         case OT_ADDR_TABLE:
-            bcu->userEeprom->addrTabAddr() = addr;
+            bcu->userEeprom->setAddrTabAddr(addr);
             DB_PROPERTIES(serial.println("  ----> userEeprom->addrTabAddr=0x", bcu->userEeprom->addrTabAddr(), HEX, 4); serial.println(););
             break;
 
         case OT_ASSOC_TABLE:
-            bcu->userEeprom->assocTabAddr() = addr;
+            bcu->userEeprom->setAssocTabAddr(addr);
             DB_PROPERTIES(serial.println("  ----> userEeprom->assocTabAddr=0x", bcu->userEeprom->assocTabAddr(), HEX, 4); serial.println(););
             break;
 
         case OT_APPLICATION:
-            bcu->userEeprom->appPeiType() = payLoad[2];
-            bcu->userEeprom->manufacturerH() = payLoad[3];
-            bcu->userEeprom->manufacturerL() = payLoad[4];
-            bcu->userEeprom->deviceTypeH() = payLoad[5];
-            bcu->userEeprom->deviceTypeL() = payLoad[6];
-            bcu->userEeprom->version() = payLoad[7];
+            bcu->userEeprom->setAppPeiType(payLoad[2]);
+            bcu->userEeprom->setManufacturerH(payLoad[3]);
+            bcu->userEeprom->setManufacturerL(payLoad[4]);
+            bcu->userEeprom->setDeviceTypeH(payLoad[5]);
+            bcu->userEeprom->setDeviceTypeL(payLoad[6]);
+            bcu->userEeprom->setVersion(payLoad[7]);
             DB_PROPERTIES(
                 serial.println("  ----> userEeprom->appPeiType = 0x", bcu->userEeprom->appPeiType(), HEX, 2);
                 serial.println("  ----> userEeprom->manufacturerH & L = 0x", makeWord(bcu->userEeprom->manufacturerH(), bcu->userEeprom->manufacturerL()), HEX, 4);
@@ -306,8 +306,8 @@ LoadState PropertiesBCU2::handleTaskCtrl1([[maybe_unused]] const int objectIdx, 
     // payLoad[0..1] : interface object address
     // payLoad[2]    : nr. of interface objects
     // payLoad[3..7] : reserved
-    bcu->userEeprom->eibObjAddr() = makeWord(payLoad[0], payLoad[1]);
-    bcu->userEeprom->eibObjCount() = payLoad[2];
+    bcu->userEeprom->setEibObjAddr(makeWord(payLoad[0], payLoad[1]));
+    bcu->userEeprom->setEibObjCount(payLoad[2]);
     DB_PROPERTIES(
         serial.print("handleTaskCtrl1 ONLY PARTLY IMPLEMENTED! ");
         printObjectIdx(objectIdx);
@@ -338,9 +338,9 @@ LoadState PropertiesBCU2::handleTaskCtrl2([[maybe_unused]] const int objectIdx, 
     }
 
     // XXX is it ok to set .commsTabAddr, .commsSeg0Addr & .commsSeg1Addr without checking objectIdx???
-    bcu->userEeprom->commsTabAddr() = newAddress;
-    bcu->userEeprom->commsSeg0Addr() = makeWord(payLoad[4], payLoad[5]); // commsSeg0Addr is nowhere used in sblib
-    bcu->userEeprom->commsSeg1Addr() = makeWord(payLoad[6], payLoad[7]); // commsSeg1Addr is nowhere used in sblib
+    bcu->userEeprom->setCommsTabAddr(newAddress);
+    bcu->userEeprom->setCommsSeg0Addr(makeWord(payLoad[4], payLoad[5])); // commsSeg0Addr is nowhere used in sblib
+    bcu->userEeprom->setCommsSeg1Addr(makeWord(payLoad[6], payLoad[7])); // commsSeg1Addr is nowhere used in sblib
 
     DB_PROPERTIES(
         serial.print("handleTaskCtrl2 ONLY PARTLY IMPLEMENTED! ");
@@ -519,6 +519,7 @@ bool PropertiesBCU2::propertyValueWriteTelegram(const int objectIdx, const Prope
 
     const PropertyDataType type = def->type();
     uint8_t* valuePtr = def->valuePointer(bcu);
+    Memory* memory = def->valueMemory(bcu);
 
     const uint8_t* data = bcu->bus->telegram + 12;
     int len;
@@ -526,7 +527,7 @@ bool PropertiesBCU2::propertyValueWriteTelegram(const int objectIdx, const Prope
     {
         len = bcu->bus->telegramLen - 13;
         const int state = loadProperty(objectIdx, data, len);
-        bcu->userEeprom->loadState()[objectIdx] = state;
+        bcu->userEeprom->setLoadState(objectIdx, state);
         sendBuffer[12] = state;
         len = 1;
     }
@@ -536,7 +537,18 @@ bool PropertiesBCU2::propertyValueWriteTelegram(const int objectIdx, const Prope
         const int size = def->size();
         len = count * size;
         DB_PROPERTIES(serial.print("propertyValueWriteTelegram: "); printObjectIdx(objectIdx); serial.print(" "); printPropertyID(propertyId);serial.println(););
-        reverseCopy(valuePtr + start * size, data, len);
+        if (memory)
+        {
+            const uint32_t address = def->valueAddress(bcu) + start * size;
+            for (int i = 0; i < len; ++i)
+            {
+                memory->setUInt8(address + i, data[len - 1 - i]);
+            }
+        }
+        else
+        {
+            reverseCopy(valuePtr + start * size, data, len);
+        }
         reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
         if (def->isEepromPointer())
             bcu->userEeprom->modified(true);
