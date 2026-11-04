@@ -403,17 +403,12 @@ namespace
         return Frame(value, value + octets);
     }
 
-    // (d) SYSTEM B reads 2 elements of PID_MCB_TABLE (16 octets) into an extended response, 1 element (8) standard
+    // (d) SYSTEM B has one element per property, 2 elements of PID_MCB_TABLE (16 octets) are rejected:
+    // number of elements 0, standard response
     void systemBPropertyRead()
     {
-        uint8_t* eeprom = bcuUnderTest->userEeprom->userEepromData;
-        for (uint8_t i = 0; i < 16; i++)
-        {
-            eeprom[UserEepromSYSTEMB::addrTabMcbOffset + i] = static_cast<uint8_t>(0x30 + i);
-        }
         const Frame actual = connectedRequest(true, {0x03, 0xD5, OT_ADDR_TABLE, PID_MCB_TABLE, 0x20, 0x01});
-        CHECK(actual == propertyResponse(OT_ADDR_TABLE, PID_MCB_TABLE, 2, pattern(16, 0x30)));
-        CHECK(actual[6] == 5 + 16);
+        CHECK(actual == propertyResponse(OT_ADDR_TABLE, PID_MCB_TABLE, 0, {}));
     }
 
     void systemBPropertyReadStandard()
@@ -428,21 +423,23 @@ namespace
         CHECK(actual[5] == (0x60 | 13));
     }
 
-    // (d) SYSTEM B writes 16 octets, the extended response holds the stored value
+    // (d) SYSTEM B rejects 2 elements of PID_MCB_TABLE (16 octets): number of elements 0, standard response,
+    // the stored value is unchanged
     void systemBPropertyWrite()
     {
+        const Frame before = propertyValue(OT_ADDR_TABLE, PID_MCB_TABLE, 16);
         Frame tpdu = {0x03, 0xD7, OT_ADDR_TABLE, PID_MCB_TABLE, 0x20, 0x01};
         const Frame value = pattern(16, 0x50);
         tpdu.insert(tpdu.end(), value.begin(), value.end());
-        CHECK(connectedRequest(true, tpdu) == propertyResponse(OT_ADDR_TABLE, PID_MCB_TABLE, 2, value));
-        CHECK(propertyValue(OT_ADDR_TABLE, PID_MCB_TABLE, 16) == value);
+        CHECK(connectedRequest(true, tpdu) == propertyResponse(OT_ADDR_TABLE, PID_MCB_TABLE, 0, {}));
+        CHECK(propertyValue(OT_ADDR_TABLE, PID_MCB_TABLE, 16) == before);
     }
 
     // (d) a value shorter than nr_of_elem * size is rejected: number of elements 0, standard response
     void systemBPropertyWriteTooShort()
     {
-        Frame tpdu = {0x03, 0xD7, OT_ADDR_TABLE, PID_MCB_TABLE, 0x20, 0x01};
-        const Frame value = pattern(15, 0x50);
+        Frame tpdu = {0x03, 0xD7, OT_ADDR_TABLE, PID_MCB_TABLE, 0x10, 0x01};
+        const Frame value = pattern(7, 0x50);
         tpdu.insert(tpdu.end(), value.begin(), value.end());
         CHECK(connectedRequest(true, tpdu) == propertyResponse(OT_ADDR_TABLE, PID_MCB_TABLE, 0, {}));
     }

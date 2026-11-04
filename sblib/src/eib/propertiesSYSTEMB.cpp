@@ -420,6 +420,22 @@ bool PropertiesSYSTEMB::propertyValueReadTelegram(const int objectIdx, const Pro
     const auto type = (PropertyDataType)(def->control & PC_TYPE_MASK);
     const uint8_t* valuePtr = def->valuePointer(bcu);
 
+    // all properties of the property tables have exactly one element
+    const int numElements = 1;
+    if (start == 0)
+    {
+        // element 0 holds the current number of elements
+        sendBuffer[telegramTpciIndex(sendBuffer) + 6] = HIGH_BYTE(numElements);
+        sendBuffer[telegramTpciIndex(sendBuffer) + 7] = lowByte(numElements);
+        telegramAddApduLength(sendBuffer, 2);
+        return true;
+    }
+
+    if (start + count - 1 > numElements)
+    {
+        return false; // elements out of range
+    }
+
     --start;
     const int size = def->size();
     int len = count * size;
@@ -477,6 +493,18 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
     }
     else
     {
+        // all properties of the property tables have exactly one element
+        const int numElements = 1;
+        if (start == 0)
+        {
+            return false; // writing element 0 would reset the number of elements, not supported
+        }
+
+        if (start + count - 1 > numElements)
+        {
+            return false; // elements out of range
+        }
+
         --start;
         const int size = def->size();
         len = count * size;

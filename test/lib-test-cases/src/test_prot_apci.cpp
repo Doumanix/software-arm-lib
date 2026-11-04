@@ -673,6 +673,30 @@ static Telegram apciSystemBLoadStateTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
+// element count checks (PID_MCB_TABLE has 1 element of 8 octets, PID_PROGRAM_VERSION 1 of 5): element 0 holds the number of elements,
+// requests beyond the last element and writing element 0 are rejected with a response without data
+static Telegram apciSystemBElementCountTelegrams[] =
+{
+    TEL_CONNECT,
+    {TEL_RX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(0), 0xD5, 0x04, 0x1B, 0x20, 0x01}},
+    TEL_ACK_TX(0),
+    {TEL_TX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x65, TPCI_DATA(0), 0xD6, 0x04, 0x1B, 0x00, 0x01}},
+    TEL_ACK_RX(0),
+    {TEL_RX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(1), 0xD5, 0x04, 0x1B, 0x10, 0x00}},
+    TEL_ACK_TX(1),
+    {TEL_TX, 14, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x67, TPCI_DATA(1), 0xD6, 0x04, 0x1B, 0x10, 0x00, 0x00, 0x01}},
+    TEL_ACK_RX(1),
+    {TEL_RX, 20, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(2), 0xD7, 0x04, 0x1B, 0x10, 0x00, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18}},
+    TEL_ACK_TX(2),
+    {TEL_TX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x65, TPCI_DATA(2), 0xD6, 0x04, 0x1B, 0x00, 0x00}},
+    TEL_ACK_RX(2),
+    {TEL_RX, 22, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(3), 0xD7, 0x04, 0x0D, 0x20, 0x01, 0x11, 0x12, 0x13, 0x14, 0x15, 0x21, 0x22, 0x23, 0x24, 0x25}},
+    TEL_ACK_TX(3),
+    {TEL_TX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x65, TPCI_DATA(3), 0xD6, 0x04, 0x0D, 0x00, 0x01}},
+    TEL_ACK_RX(3),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
 static Test_Case testCaseApciSystemBObjectType =
 {
     "APCI_PROPERTY SYSTEM B object types",
@@ -697,6 +721,19 @@ static Test_Case testCaseApciSystemBLoadState =
     NULL,
     NULL,
     apciSystemBLoadStateTelegrams
+};
+
+static Test_Case testCaseApciSystemBElementCount =
+{
+    "APCI_PROPERTY SYSTEM B element count",
+    MANUFACTURER, DEVICE, VERSION,
+    0,    //powerOnDelay
+    NULL, // eePromSetup
+    tc_setup,
+    NULL,
+    NULL,
+    NULL,
+    apciSystemBElementCountTelegrams
 };
 
 static Test_Case testCaseApciSystemBTableReference =
@@ -815,6 +852,7 @@ TEST_CASE("APCI processing", "[protocol][APCI]")
         executeTest(bcuTypeToTest, &testCaseApciSystemBTableReference);
         executeTest(bcuTypeToTest, &testCaseApciSystemBApplication);
         executeTest(bcuTypeToTest, &testCaseApciSystemBLoadState);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBElementCount);
     }
 }
 
