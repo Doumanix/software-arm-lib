@@ -155,30 +155,40 @@ LoadState PropertiesSYSTEMB::handleDataRelativeAllocation(const int objectIdx, c
     );
 
     const unsigned int reqMemSize = ((payLoad[0] << 24) | (payLoad[1] << 16) | (payLoad[2] << 8) | payLoad[3]);
-    uint16_t* tableAddress[] = {
-        &bcu->userEeprom->addrTabAddr(), &bcu->userEeprom->assocTabAddr(), &bcu->userEeprom->commsTabAddr(),
-        &bcu->userEeprom->eibObjAddr(), &bcu->userEeprom->commsSeg0Addr()
-    };
+    UserEepromSYSTEMB* userEeprom = static_cast<UserEepromSYSTEMB*>(bcu->userEeprom);
 
-    const UserEepromSYSTEMB* userEeprom = (UserEepromSYSTEMB*)bcu->userEeprom;
-
-    uint8_t* tableSize[] = {
-        &userEeprom->addrTabMcb()[0], &userEeprom->assocTabMcb()[0], &userEeprom->commsTabMcb()[0],
-        &userEeprom->eibObjMcb()[0], &userEeprom->commsSeg0Mcb()[0]
+    const uint16_t tableAddress[] = {
+        userEeprom->addrTabAddr(), userEeprom->assocTabAddr(), userEeprom->commsTabAddr(),
+        userEeprom->eibObjAddr(), userEeprom->commsSeg0Addr()
     };
 
     uint16_t virtMemAddr = 0x3A9E; ///\todo get rid of magic number USER_EEPROM_START + USER_EEPROM_SIZE
     for (int i = 0; i < 5; i++)
     {
-        if ((*tableAddress[i] != 0) && (*tableAddress[i] < virtMemAddr))
-            virtMemAddr = *tableAddress[i];
+        if ((tableAddress[i] != 0) && (tableAddress[i] < virtMemAddr))
+            virtMemAddr = tableAddress[i];
     }
-    *tableAddress[objectIdx - 1] = virtMemAddr - reqMemSize;
-    uint8_t* tabSiz = tableSize[objectIdx - 1];
-    tabSiz[0] = payLoad[0];
-    tabSiz[1] = payLoad[1];
-    tabSiz[2] = payLoad[2];
-    tabSiz[3] = payLoad[3];
+
+    const uint16_t newAddress = virtMemAddr - reqMemSize;
+    switch (objectIdx - 1)
+    {
+        case 0:
+            userEeprom->setAddrTabAddr(newAddress);
+            break;
+        case 1:
+            userEeprom->setAssocTabAddr(newAddress);
+            break;
+        case 2:
+            userEeprom->setCommsTabAddr(newAddress);
+            break;
+        case 3:
+            userEeprom->setEibObjAddr(newAddress);
+            break;
+        case 4:
+            userEeprom->setCommsSeg0Addr(newAddress);
+            break;
+    }
+    userEeprom->setMcbSize(objectIdx - 1, reqMemSize);
 
     // Mode = 0x01 => fill allocated memory
     if (payLoad[4] > 0)
@@ -234,15 +244,17 @@ int PropertiesSYSTEMB::loadProperty(const int objectIdx, const uint8_t* data, in
         const PropertyDef* def = propertyDef(objectIdx, PID_TABLE_REFERENCE);
         const uint8_t* valuePtr = def->valuePointer(bcu);
         const uint16_t virtMemStart = ((valuePtr[1] << 8) + valuePtr[0]);
-        uint8_t* memStart = (uint8_t*)(bcu->userEeprom->userEepromData + (virtMemStart - bcu->userEeprom->startAddr()));
+        uint8_t* memStart = bcu->userMemoryPtr(virtMemStart); ///\todo read from flash, see P0 step 3
 
         def = propertyDef(objectIdx, PID_MCB_TABLE);
-        uint8_t* mcbPtr = def->valuePointer(bcu);
+        const uint8_t* mcbPtr = def->valuePointer(bcu);
         const uint16_t memSize = (mcbPtr[2] << 8) + mcbPtr[3];
 
-        const uint16_t crc = crc16(memStart, memSize);
-        mcbPtr[6] = (uint8_t)(crc >> 8);
-        mcbPtr[7] = (uint8_t)crc;
+        if (memStart != nullptr)
+        {
+            const uint16_t crc = crc16(memStart, memSize);
+            static_cast<UserEepromSYSTEMB*>(bcu->userEeprom)->setMcbCrc(objectIdx - 1, crc);
+        }
 
         return newLoadState;
     }
