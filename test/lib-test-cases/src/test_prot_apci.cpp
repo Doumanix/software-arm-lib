@@ -310,6 +310,7 @@ static Telegram apciPropertyValueWriteTelegrams[] =
 #define TEL_ACK_TX(seq) {TEL_TX, 7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, TPCI_ACK(seq)}}
 #define TEL_ACK_RX(seq) {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, TPCI_ACK(seq)}}
 #define TEL_CONNECT {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}}
+#define TEL_DISCONNECT {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x81}}
 
 #define TEL_DESC_READ(seq, obj, pid) \
     {TEL_RX, 11, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD8, obj, pid, 0x00}}, \
@@ -327,6 +328,7 @@ static Telegram apciPropertyValueWriteTelegrams[] =
 #define TEL_VALUE_WRITE_5(seq, obj, pid, d0, d1, d2, d3, d4) \
     {TEL_RX, 17, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD7, obj, pid, 0x10, 0x01, d0, d1, d2, d3, d4}}, \
     TEL_ACK_TX(seq)
+#define TEL_VALUE_WRITE_10(seq, obj, pid, d0, d1, d2, d3, d4, d5, d6, d7, d8, d9)     {TEL_RX, 22, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD7, obj, pid, 0x10, 0x01, d0, d1, d2, d3, d4, d5, d6, d7, d8, d9}},     TEL_ACK_TX(seq)
 #define TEL_VALUE_RESPONSE_1(seq, obj, pid, d0) \
     {TEL_TX, 13, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x66, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0}}, \
     TEL_ACK_RX(seq)
@@ -339,6 +341,35 @@ static Telegram apciPropertyValueWriteTelegrams[] =
 #define TEL_VALUE_RESPONSE_5(seq, obj, pid, d0, d1, d2, d3, d4) \
     {TEL_TX, 17, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x6A, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0, d1, d2, d3, d4}}, \
     TEL_ACK_RX(seq)
+
+// PID_LOAD_STATE_CONTROL (05h): write the load event, the response holds the new load state
+#define TEL_LOAD_EVENT(seq, obj, event, state)     TEL_VALUE_WRITE_10(seq, obj, 0x05, event, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00),     TEL_VALUE_RESPONSE_1(seq, obj, 0x05, state)
+// Additional Load Controls with the segment type 0Bh (data relative allocation), requested size 0x10
+#define TEL_LOAD_ADDITIONAL(seq, obj, state)     TEL_VALUE_WRITE_10(seq, obj, 0x05, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00),     TEL_VALUE_RESPONSE_1(seq, obj, 0x05, state)
+
+// load events: 00h No Operation, 01h Start Loading, 02h Load Completed, 03h Additional Load Controls, 04h Unload
+// load states: 0 Unloaded, 1 Loaded, 2 Loading, 3 Error
+// ways to reach a state, seq is the next sequence number, Error is reached by Additional Load Controls in Loaded
+#define TEL_REACH_UNLOADED(seq, obj) TEL_LOAD_EVENT(seq, obj, 0x04, 0x00)
+#define TEL_REACH_LOADING(seq, obj) TEL_REACH_UNLOADED(seq, obj), TEL_LOAD_EVENT(seq + 1, obj, 0x01, 0x02)
+#define TEL_REACH_LOADED(seq, obj) TEL_REACH_LOADING(seq, obj), TEL_LOAD_EVENT(seq + 2, obj, 0x02, 0x01)
+#define TEL_REACH_ERROR(seq, obj) TEL_REACH_LOADED(seq, obj), TEL_LOAD_ADDITIONAL(seq + 3, obj, 0x03)
+#define TEL_REACH_UNLOADED_N 1
+#define TEL_REACH_LOADING_N 2
+#define TEL_REACH_LOADED_N 3
+#define TEL_REACH_ERROR_N 4
+
+// one transition: connect, reach the state, send the event, the response and the read back value hold the new state
+#define TEL_LOAD_TRANSITION(obj, state, event, expected)     TEL_CONNECT,     TEL_REACH_##state(0, obj),     TEL_LOAD_EVENT(TEL_REACH_##state##_N, obj, event, expected),     TEL_VALUE_READ(TEL_REACH_##state##_N + 1, obj, 0x05),     TEL_VALUE_RESPONSE_1(TEL_REACH_##state##_N + 1, obj, 0x05, expected), TEL_DISCONNECT
+
+// Additional Load Controls with a segment (data relative allocation) instead of a plain event
+#define TEL_LOAD_TRANSITION_SEGMENT(obj, state, expected)     TEL_CONNECT,     TEL_REACH_##state(0, obj),     TEL_LOAD_ADDITIONAL(TEL_REACH_##state##_N, obj, expected),     TEL_VALUE_READ(TEL_REACH_##state##_N + 1, obj, 0x05),     TEL_VALUE_RESPONSE_1(TEL_REACH_##state##_N + 1, obj, 0x05, expected), TEL_DISCONNECT
+
+// too short data (5 octets instead of 10) leave the state unchanged
+#define TEL_LOAD_SHORT(obj, state, event, expected)     TEL_CONNECT,     TEL_REACH_##state(0, obj),     TEL_VALUE_WRITE_5(TEL_REACH_##state##_N, obj, 0x05, event, 0x00, 0x00, 0x00, 0x00),     TEL_VALUE_RESPONSE_1(TEL_REACH_##state##_N, obj, 0x05, expected), TEL_DISCONNECT
+
+// Table 94: all events from all states, an unknown event (09h) and too short data
+#define TEL_LOAD_STATE_SEQUENCE(obj)     TEL_LOAD_TRANSITION(obj, UNLOADED, 0x00, 0x00), TEL_LOAD_TRANSITION(obj, UNLOADED, 0x01, 0x02),     TEL_LOAD_TRANSITION(obj, UNLOADED, 0x02, 0x00), TEL_LOAD_TRANSITION_SEGMENT(obj, UNLOADED, 0x00),     TEL_LOAD_TRANSITION(obj, UNLOADED, 0x04, 0x00), TEL_LOAD_TRANSITION(obj, UNLOADED, 0x09, 0x00),     TEL_LOAD_TRANSITION(obj, LOADED, 0x00, 0x01), TEL_LOAD_TRANSITION(obj, LOADED, 0x01, 0x02),     TEL_LOAD_TRANSITION(obj, LOADED, 0x02, 0x01), TEL_LOAD_TRANSITION_SEGMENT(obj, LOADED, 0x03),     TEL_LOAD_TRANSITION(obj, LOADED, 0x04, 0x00), TEL_LOAD_TRANSITION(obj, LOADED, 0x09, 0x01),     TEL_LOAD_TRANSITION(obj, LOADING, 0x00, 0x02), TEL_LOAD_TRANSITION(obj, LOADING, 0x01, 0x02),     TEL_LOAD_TRANSITION(obj, LOADING, 0x02, 0x01), TEL_LOAD_TRANSITION_SEGMENT(obj, LOADING, 0x02),     TEL_LOAD_TRANSITION(obj, LOADING, 0x04, 0x00), TEL_LOAD_TRANSITION(obj, LOADING, 0x09, 0x02),     TEL_LOAD_TRANSITION(obj, ERROR, 0x00, 0x03), TEL_LOAD_TRANSITION(obj, ERROR, 0x01, 0x03),     TEL_LOAD_TRANSITION(obj, ERROR, 0x02, 0x03), TEL_LOAD_TRANSITION_SEGMENT(obj, ERROR, 0x03),     TEL_LOAD_TRANSITION(obj, ERROR, 0x04, 0x00), TEL_LOAD_TRANSITION(obj, ERROR, 0x09, 0x03),     TEL_LOAD_SHORT(obj, LOADING, 0x04, 0x02), TEL_LOAD_SHORT(obj, UNLOADED, 0x01, 0x00),     TEL_LOAD_SHORT(obj, ERROR, 0x04, 0x03)
 
 static void setSystemBTableAddresses([[maybe_unused]] void* state, [[maybe_unused]] unsigned int var)
 {
@@ -631,6 +662,17 @@ MEMORY_TEST_CASE(testCaseMemoryWriteVerifyModeOk, tc_setupVerifyMode, apciMemory
 MEMORY_TEST_CASE(testCaseMemoryWriteVerifyModeFailed, tc_setupVerifyMode, apciMemoryWriteVerifyModeFailedTelegrams);
 MEMORY_TEST_CASE(testCaseMemoryWriteVerifyModeInactiveFailed, tc_setup, apciMemoryWriteVerifyModeInactiveFailedTelegrams);
 
+// load state machine of the objects 1 to 5 (Table 94 of KNX 03_05_01 4.23.2.3.3), each transition on its own connection
+static Telegram apciSystemBLoadStateTelegrams[] =
+{
+    TEL_LOAD_STATE_SEQUENCE(1),
+    TEL_LOAD_STATE_SEQUENCE(2),
+    TEL_LOAD_STATE_SEQUENCE(3),
+    TEL_LOAD_STATE_SEQUENCE(4),
+    TEL_LOAD_STATE_SEQUENCE(5),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
 static Test_Case testCaseApciSystemBObjectType =
 {
     "APCI_PROPERTY SYSTEM B object types",
@@ -642,6 +684,19 @@ static Test_Case testCaseApciSystemBObjectType =
     NULL,
     NULL,
     apciSystemBObjectTypeTelegrams
+};
+
+static Test_Case testCaseApciSystemBLoadState =
+{
+    "APCI_PROPERTY SYSTEM B load state machine",
+    MANUFACTURER, DEVICE, VERSION,
+    0,    //powerOnDelay
+    NULL, // eePromSetup
+    tc_setup,
+    NULL,
+    NULL,
+    NULL,
+    apciSystemBLoadStateTelegrams
 };
 
 static Test_Case testCaseApciSystemBTableReference =
@@ -759,6 +814,7 @@ TEST_CASE("APCI processing", "[protocol][APCI]")
         executeTest(bcuTypeToTest, &testCaseApciSystemBObjectType);
         executeTest(bcuTypeToTest, &testCaseApciSystemBTableReference);
         executeTest(bcuTypeToTest, &testCaseApciSystemBApplication);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBLoadState);
     }
 }
 
