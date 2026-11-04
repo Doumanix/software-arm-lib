@@ -182,10 +182,8 @@ LoadState PropertiesSYSTEMB::handleDataRelativeAllocation(const int objectIdx, c
     // Mode = 0x01 => fill allocated memory
     if (payLoad[4] > 0)
     {
-        uint8_t* physMemAddr = (uint8_t*)(bcu->userEeprom->userEepromData + (virtMemAddr - bcu->userEeprom->startAddr()));
         const uint8_t fillByte = payLoad[5];
-        for (uint32_t i = 0; i < reqMemSize; i++)
-            physMemAddr[i] = fillByte;
+        bcu->userEeprom->fill(virtMemAddr, reqMemSize, fillByte);
     }
 
     return LS_LOADING;
@@ -359,6 +357,7 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
 
     const PropertyDataType type = def->type();
     uint8_t* valuePtr = def->valuePointer(bcu);
+    Memory* memory = def->valueMemory(bcu);
 
     const uint8_t* data = bcu->bus->telegram + 12;
     int len;
@@ -367,7 +366,7 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
     {
         len = bcu->bus->telegramLen - 13;
         const int state = loadProperty(objectIdx, data, len);
-        bcu->userEeprom->loadState()[objectIdx] = state;
+        bcu->userEeprom->setLoadState(objectIdx, state);
         sendBuffer[12] = state;
         len = 1;
     }
@@ -379,12 +378,30 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
         DB_PROPERTIES(serial.print("propertyValueWriteTelegram: "); printObjectIdx(objectIdx); serial.print(" "); printPropertyID(propertyId); serial.println(););
         if (type >= PDT_CHAR_BLOCK) // byte arrays are stored in telegram order, like in propertyValueReadTelegram()
         {
-            memcpy(valuePtr + start * size, data, len);
+            if (memory)
+            {
+                memory->write(def->valueAddress(bcu) + start * size, data, len);
+            }
+            else
+            {
+                memcpy(valuePtr + start * size, data, len);
+            }
             memcpy(sendBuffer + 12, valuePtr + start * size, len);
         }
         else
         {
-            reverseCopy(valuePtr + start * size, data, len);
+            if (memory)
+            {
+                const uint32_t address = def->valueAddress(bcu) + start * size;
+                for (int i = 0; i < len; ++i)
+                {
+                    memory->setUInt8(address + i, data[len - 1 - i]);
+                }
+            }
+            else
+            {
+                reverseCopy(valuePtr + start * size, data, len);
+            }
             reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
         }
         if (def->isEepromPointer())
