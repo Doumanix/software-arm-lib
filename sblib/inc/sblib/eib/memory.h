@@ -58,7 +58,7 @@ public:
      * @return          Content as byte at the given @ref address
      * @note @ref startAddress will be subtracted from @ref address
      */
-    [[nodiscard]] virtual uint8_t getUInt8(uint32_t address) const = 0;
+    [[nodiscard]] uint8_t getUInt8(uint32_t address) const;
 
     /**
      * Gets a word from the memory at given @ref address and address + 1
@@ -67,7 +67,7 @@ public:
      * @return          Content as word at the @ref address
      * @note @ref startAddress will be subtracted from @ref address
      */
-    [[nodiscard]] virtual uint16_t getUInt16(uint32_t address) const = 0;
+    [[nodiscard]] uint16_t getUInt16(uint32_t address) const;
 
     /**
      * Gets a double word (big endian, like @ref getUInt16) from the memory at given @ref address up to address + 3
@@ -76,7 +76,7 @@ public:
      * @return          Content as double word at the @ref address, 0 if the range is not accessible
      * @note @ref startAddress will be subtracted from @ref address
      */
-    [[nodiscard]] virtual uint32_t getUInt32(uint32_t address) const = 0;
+    [[nodiscard]] uint32_t getUInt32(uint32_t address) const;
 
     /**
      * Copies @ref count bytes from the memory at given @ref address to @ref dst
@@ -88,7 +88,7 @@ public:
      *                  and nothing is copied. Unlike @ref operator[] this does not end in fatalError().
      * @note @ref startAddress will be subtracted from @ref address
      */
-    [[nodiscard]] virtual bool read(uint32_t address, uint8_t* dst, uint32_t count) const = 0;
+    [[nodiscard]] bool read(uint32_t address, uint8_t* dst, uint32_t count) const;
 
     /**
      * Sets a byte in the memory at given @ref address
@@ -98,7 +98,7 @@ public:
      * @return          True if @ref address is accessible and the byte was set, otherwise false
      * @note @ref startAddress will be subtracted from @ref address
      */
-    virtual bool setUInt8(uint32_t address, uint8_t value) = 0;
+    bool setUInt8(uint32_t address, uint8_t value);
 
     /**
      * Sets a word (big endian, like @ref getUInt16) in the memory at given @ref address and address + 1
@@ -108,7 +108,7 @@ public:
      * @return          True if the range is accessible and the word was set, otherwise false and nothing is changed
      * @note @ref startAddress will be subtracted from @ref address
      */
-    virtual bool setUInt16(uint32_t address, uint16_t value) = 0;
+    bool setUInt16(uint32_t address, uint16_t value);
 
     /**
      * Sets a double word (big endian, like @ref getUInt32) in the memory at given @ref address up to address + 3
@@ -118,7 +118,7 @@ public:
      * @return          True if the range is accessible and the double word was set, otherwise false and nothing is changed
      * @note @ref startAddress will be subtracted from @ref address
      */
-    virtual bool setUInt32(uint32_t address, uint32_t value) = 0;
+    bool setUInt32(uint32_t address, uint32_t value);
 
     /**
      * Copies @ref count bytes from @ref src to the memory at given @ref address
@@ -129,7 +129,7 @@ public:
      * @return          True if the whole range is accessible and was copied, otherwise false and nothing is changed
      * @note @ref startAddress will be subtracted from @ref address
      */
-    virtual bool write(uint32_t address, const uint8_t* src, uint32_t count) = 0;
+    bool write(uint32_t address, const uint8_t* src, uint32_t count);
 
     /**
      * Sets @ref count bytes of the memory at given @ref address to @ref value
@@ -140,7 +140,7 @@ public:
      * @return          True if the whole range is accessible and was set, otherwise false and nothing is changed
      * @note @ref startAddress will be subtracted from @ref address
      */
-    virtual bool fill(uint32_t address, uint32_t count, uint8_t value) = 0;
+    bool fill(uint32_t address, uint32_t count, uint8_t value);
 
     /**
      * Checks, if an @ref address is accessible in the memory
@@ -193,6 +193,18 @@ protected:
     uint32_t startAddress; //!< virtual start address of the memory
     uint32_t endAddress;   //!< virtual end address of the memory
     uint32_t sizeTotal;    //!< size in bytes of the memory
+
+    /**
+     * Backing store of the memory, set by the derived class. The access functions getUInt8/16/32, read,
+     * setUInt8/16/32, write and fill work on it, they are not virtual to keep the vtables small.
+     */
+    uint8_t* data = nullptr;
+
+    /**
+     * Called by write and fill after the content was changed, may be nullptr.
+     * A function pointer instead of a virtual function, so no vtable entry is added.
+     */
+    void (*changedHook)(Memory* memory) = nullptr;
 
     /**
      * Changes the given absolute memory address to the real internal index

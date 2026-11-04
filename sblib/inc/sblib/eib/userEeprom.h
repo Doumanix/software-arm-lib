@@ -90,20 +90,11 @@ public:
      */
     uint8_t& operator[](uint32_t address) override;
 
-    [[nodiscard]] uint8_t getUInt8(uint32_t address) const override;
-    [[nodiscard]] uint16_t getUInt16(uint32_t address) const override;
-    [[nodiscard]] uint32_t getUInt32(uint32_t address) const override;
-    [[nodiscard]] bool read(uint32_t address, uint8_t* dst, uint32_t count) const override;
-
     /**
-     * @note The write functions below mark the user EEPROM as modified (see @ref modified) only if at least one
-     *       byte really changes. Writing the current content keeps the flash untouched.
+     * @note The write functions of @ref Memory (setUInt8/16/32, write and fill) mark the user EEPROM as modified
+     *       (see @ref modified) only if at least one byte really changes. Writing the current content keeps the
+     *       flash untouched.
      */
-    bool setUInt8(uint32_t address, uint8_t value) override;
-    bool setUInt16(uint32_t address, uint16_t value) override;
-    bool setUInt32(uint32_t address, uint32_t value) override;
-    bool write(uint32_t address, const uint8_t* src, uint32_t count) override;
-    bool fill(uint32_t address, uint32_t count, uint8_t value) override;
 
     /**
      * Mark/unmark the user EEPROM as modified. The EEPROM will be written to flash when the
