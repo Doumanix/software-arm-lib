@@ -43,15 +43,22 @@ TEST_CASE("APCI access in an extended frame", "[SBLIB][KNX][APCI][lf]")
     CHECK(apciCommand(telegram) == APCI_GROUP_VALUE_WRITE_PDU + 1);
 }
 
-TEST_CASE("APCI of a send buffer without control field", "[SBLIB][KNX][APCI][lf]")
+TEST_CASE("APCI of a send buffer follows the control field", "[SBLIB][KNX][APCI][lf]")
 {
-    // Connected responses get their control field after processApci(): the APCI is written to the
-    // octets 6 and 7 of a standard frame, independent of the control field.
+    // Send buffers get their control field before the APCI is written
     uint8_t sendBuffer[10] = {};
+    initLpdu(sendBuffer, PRIORITY_LOW, false, FRAME_STANDARD);
     setApciCommand(sendBuffer, APCI_DEVICEDESCRIPTOR_RESPONSE_PDU, 0);
     CHECK(sendBuffer[6] == 0x03);
     CHECK(sendBuffer[7] == 0x40);
     CHECK(sendBuffer[8] == 0x00);
+
+    uint8_t extended[10] = {};
+    initLpdu(extended, PRIORITY_LOW, false, FRAME_EXTENDED);
+    setApciCommand(extended, APCI_DEVICEDESCRIPTOR_RESPONSE_PDU, 0);
+    CHECK(extended[6] == 0x00);
+    CHECK(extended[7] == 0x03);
+    CHECK(extended[8] == 0x40);
 }
 
 namespace
