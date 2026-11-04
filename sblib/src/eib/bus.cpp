@@ -508,6 +508,10 @@ void Bus::handleTelegram(const bool valid)
 #ifndef BUSMONITOR // no processing if we are in monitor mode
 
     // Received a valid telegram with correct checksum and valid control byte (normal data frame with preamble bits)?
+    // A faulty frame (parity or checksum error, invalid control byte or length) is deliberately not answered with a NAK
+    // although KNX 03_02_02 2.4.2 says "shall send NAK": its address fields are not reliable, so the NAK could come from
+    // a device that is not addressed. The sender gets no acknowledge within the timeout and repeats with the same
+    // repetition count as after a NAK.
 #if SBLIB_MAX_APDU_LENGTH > 15
     // Standard or extended frame, the length matches the length field
     if (nextByteIndex >= 8 && valid && isValidDataFrame(rx_telegram, nextByteIndex, rx_error))
@@ -531,12 +535,24 @@ void Bus::handleTelegram(const bool valid)
         {
 #endif
             processTel = (destAddr == 0);                                                          // broadcast
-            processTel |= (addressTable != nullptr) && (addressTable->indexOfAddr(destAddr) >= 0); // known group address
+            if (addressTable != nullptr)
+            {
+                processTel |= (addressTable->indexOfAddr(destAddr) >= 0); // known group address
+                // An address table of length 0 accepts all group addresses (KNX 03_05_01 4.16.3.3.1), the upper layers
+                // find no object for them. Length 1 holds only our own address and accepts none.
+                if (addressTable->addrTable() != nullptr)
+                {
+                    processTel |= (addressTable->addrCount() == 0);
+                }
+            }
         }
         else if (destAddr == ownAddress)
         {
             processTel = true;
         }
+
+        // only a telegram addressed to us is acknowledged (KNX 03_02_02 2.4.2), also with disabled TL
+        const bool ackTel = processTel;
 
         // with disabled TL we also process the telegram, so the application (e.g. ft12, knx-if) can handle it completely by itself
         processTel |= !(callBack->getLayerStatus() & BCU_STATUS_TRANSPORT_LAYER);
@@ -564,11 +580,20 @@ void Bus::handleTelegram(const bool valid)
             // check for space in rx buffer for next telegram, if no space available, send nothing
             if (telegramLen)
             {
-                // KNX Spec. 2.1. 3/2/2 2.4.1 p.38
-                // Device should only send a LL_BUSY if it knows that the telegram can be processed within the next 100ms.
-                // Since we know nothing about the running application we better send nothing
-                sendAck = 0;
-                rx_error |= RX_BUFFER_BUSY;
+                if (already_received)
+                {
+                    // The repetition of the telegram still waiting in the buffer: we have it, so acknowledge it
+                    // (KNX Spec. 3/2/2 2.4.2) and do not take it again
+                    sendAck = SB_BUS_ACK;
+                }
+                else
+                {
+                    // KNX Spec. 2.1. 3/2/2 2.4.1 p.38
+                    // Device should only send a LL_BUSY if it knows that the telegram can be processed within the next 100ms.
+                    // Since we know nothing about the running application we better send nothing
+                    sendAck = 0;
+                    rx_error |= RX_BUFFER_BUSY;
+                }
             }
             else
             {
@@ -586,6 +611,8 @@ void Bus::handleTelegram(const bool valid)
             auto suppressAck = !(callBack->getLayerStatus() & BCU_STATUS_LINK_LAYER);
             // LL_ACK only allowed for L_Data frames
             suppressAck |= rx_telegram[0] & SB_TEL_DATA_FRAME_FLAG;
+            // no LL_ACK for a telegram that is only taken because the TL is disabled
+            suppressAck |= !ackTel;
             if (suppressAck)
             {
                 sendAck = 0;

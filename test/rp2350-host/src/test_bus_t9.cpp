@@ -1294,6 +1294,103 @@ TEST_CASE("bus load: a repetition after a lost acknowledge is acknowledged but n
     CHECK(r.peer->download.attempts[7] == 2);
 }
 
+TEST_CASE("bus load: the repetition of a telegram still in the buffer is acknowledged, another one is not",
+          "[rp2350][bus][load]")
+{
+    // KNX 3/2/2 2.4.2: a received telegram is acknowledged. The application needs longer than the peer's
+    // repetitions and the first acknowledge is lost: the repetition of the telegram in telegram[] is
+    // acknowledged and not taken again; a different telegram stays without acknowledge (no BUSY, bus.cpp)
+    DownloadResult r;
+    runDownload(r, 2, 300000, {0});
+    REQUIRE(r.peer->download.done);
+    CHECK(r.consumer.received.size() == 1);
+    CHECK(r.peer->download.attempts[0] == 2);
+    CHECK(r.peer->download.acknowledged[0]);
+    CHECK(r.peer->download.attempts[1] == 4);
+    CHECK_FALSE(r.peer->download.acknowledged[1]);
+}
+
+TEST_CASE("bus acknowledge: with the transport layer off every frame is taken, only addressed ones are acknowledged",
+          "[rp2350][bus][ack]")
+{
+    // KNX 03_02_02 2.4.2: acknowledge after addressing check; a frame to another individual address gets none.
+    // The application (ft12, knx-if) still gets every frame when the TL is off (bus.cpp)
+    constexpr uint16_t ForeignAddress = 0x1201;
+    const auto toIndividual = [](const uint16_t address)
+    {
+        return withChecksum(
+                {0xB0, 0x11, 0x02, static_cast<uint8_t>(address >> 8), static_cast<uint8_t>(address & 0xff), 0x60, 0x80});
+    };
+    struct Case
+    {
+        const char* name;
+        std::vector<uint8_t> frame;
+        bool tlOff;
+        bool taken;
+        bool acknowledged;
+    };
+    const std::vector<Case> cases = {
+            {"foreign individual address, TL off", toIndividual(ForeignAddress), true, true, false},
+            {"own individual address, TL off", toIndividual(OwnAddress), true, true, true},
+            {"known group address, TL off", remoteGroupWrite(1), true, true, true},
+            {"foreign individual address, TL on", toIndividual(ForeignAddress), false, false, false},
+    };
+    for (const auto& c: cases)
+    {
+        DYNAMIC_SECTION(c.name)
+        {
+            startBus();
+            if (c.tlOff)
+            {
+                callback.layerStatus = BCU_STATUS_LINK_LAYER;
+            }
+            Peer peer;
+            peer.attach();
+            Consumer consumer;
+            peer.send(sim::now() + 1000, c.frame);
+            runMain(consumer, 60000);
+            CHECK(consumer.received.size() == (c.taken ? 1u : 0u));
+            REQUIRE(peer.sent.size() == 1);
+            CHECK((peer.acknowledgeOf(peer.sent[0]) != nullptr) == c.acknowledged);
+        }
+    }
+}
+
+TEST_CASE("bus acknowledge: an address table of length 0 accepts all group addresses, length 1 none",
+          "[rp2350][bus][ack]")
+{
+    // KNX 03_05_01 4.16.3.3.1: length 0 accepts and acknowledges every group telegram (the upper layers find no
+    // object), length 1 (only our individual address) none
+    constexpr uint8_t UnknownGroupAddress = GroupAddress + 1;
+    const auto unknownGroupWrite = withChecksum({0xBC, 0x11, 0x02, 0x00, UnknownGroupAddress, 0xE1, 0x00, 0x81});
+    struct Case
+    {
+        uint8_t length;
+        bool known;
+        bool taken;
+    };
+    for (const auto& c: {Case{0, false, true}, Case{1, false, false}, Case{2, true, false}})
+    {
+        DYNAMIC_SECTION("table length " << static_cast<int>(c.length))
+        {
+            startBus();
+            addrTables.hasTable = true;
+            addrTables.tableLength = c.length;
+            Peer peer;
+            peer.attach();
+            Consumer consumer;
+            peer.send(sim::now() + 1000, unknownGroupWrite);
+            peer.send(sim::now() + 60000, remoteGroupWrite());
+            runMain(consumer, 120000);
+            addrTables = TestAddrTables{};
+            REQUIRE(peer.sent.size() == 2);
+            CHECK((peer.acknowledgeOf(peer.sent[0]) != nullptr) == c.taken);
+            CHECK((peer.acknowledgeOf(peer.sent[1]) != nullptr) == (c.length != 1));
+            CHECK(consumer.received.size() == (c.taken ? 1u : 0u) + (c.length != 1 ? 1u : 0u));
+        }
+    }
+}
+
 // ------------------------------------------------------------------ GPIO interrupt of the application
 
 namespace

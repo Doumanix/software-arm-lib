@@ -35,21 +35,6 @@
 namespace bustest
 {
 
-    class TestAddrTables : public AddrTables
-    {
-    public:
-        int indexOfAddr(const int addr) override
-        {
-            if (addr == GroupAddress)
-            {
-                return 1;
-            }
-            return -1;
-        }
-        uint8_t* addrTable() override { return nullptr; }
-        uint8_t* assocTable() override { return nullptr; }
-    };
-
     TestAddrTables addrTables;
     TestCallback callback;
     std::unique_ptr<Bus> bus;

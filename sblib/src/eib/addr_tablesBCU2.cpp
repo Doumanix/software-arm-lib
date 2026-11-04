@@ -17,6 +17,16 @@ int AddrTablesBCU2::indexOfAddr(const int addr)
 
     if (tab)
         num = *tab;
+    if (tab && bcu && num >= 2)
+    {
+        // The last group address ends 2 * num bytes behind the table start, like AddrTablesBCU1::indexOfAddr()
+        const uint8_t* addr = (uint8_t*)&bcu->userEeprom->addrTabAddr();
+        const unsigned int memAddr = makeWord(*(addr + 1), *addr);
+        if (bcu->userMemoryPtr(memAddr + 2 * num) == nullptr)
+        {
+            return -1;
+        }
+    }
     tab += 3;
 
     const int addrHigh = addr >> 8;
