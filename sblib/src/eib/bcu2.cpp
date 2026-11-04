@@ -142,7 +142,7 @@ bool BCU2::processApci(const ApciCommand apciCmd, unsigned char* telegram, const
             else
                 found = properties->propertyValueWriteTelegram(index, (PropertyID)id, count, address, sendBuffer);
             if (!found)
-                sendBuffer[10] = 0;
+                sendBuffer[10] &= 0x0f; // number of elements 0, start index unchanged
             return (true);
 
         case APCI_PROPERTY_DESCRIPTION_READ_PDU:
