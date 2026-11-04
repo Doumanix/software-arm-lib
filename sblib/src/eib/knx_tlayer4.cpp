@@ -807,6 +807,11 @@ void TLayer4::actionA02sendAckPduAndProcessApci(const ApciCommand apciCmd, const
     // messages lingering in the buffer. The message will not be sent prematurely as the sending is
     // triggered in loop(), which can only execute after this function returns.
     *sendBufferState = TELEGRAM_ACQUIRED;
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // The application layer writes the APCI relative to the control field, so the header is set first
+    initLpdu(sendBuffer, priority(telegram), false, FRAME_STANDARD);
+    setDestinationAddress(sendBuffer, connectedAddr);
+#endif
     const auto sendResponse = processApci(apciCmd, telegram, telLength, sendBuffer);
     if (sendResponse)
     {
