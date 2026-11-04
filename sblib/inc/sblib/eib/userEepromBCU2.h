@@ -53,6 +53,13 @@ public:
     bool setCommsSeg0Addr(const uint16_t value) { return setShadow16(commsSeg0AddrOffset, value); }
     bool setCommsSeg1Addr(const uint16_t value) { return setShadow16(commsSeg1AddrOffset, value); }
     bool setEibObjAddr(const uint16_t value) { return setShadow16(eibObjAddrOffset, value); }
+    bool setAppType(const uint8_t value) { return setUInt8(startAddr() + appTypeOffset, value); }
+    bool setSerial(const uint8_t* src, const uint32_t count) { return write(startAddr() + serialOffset, src, count); }
+    bool setOrder(const uint8_t* src, const uint32_t count) { return write(startAddr() + orderOffset, src, count); }
+    bool setOrderInfo(const uint32_t index, const uint8_t value)
+    {
+        return setUInt8(startAddr() + orderInfoOffset + index, value);
+    }
     bool setEibObjCount(const uint8_t value) { return setUInt8(startAddr() + eibObjCountOffset, value); }
     bool setAddrTabAddr(const uint16_t value) { return setShadow16(addrTabAddrOffset, value); }
     bool setAssocTabAddr(const uint16_t value) { return setShadow16(assocTabAddrOffset, value); }
