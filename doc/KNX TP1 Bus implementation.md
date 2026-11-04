@@ -264,6 +264,11 @@ A received frame should be processed only if it is addressed:
 
 **We send no acknowledge when we did receive an incorrect frame or correct frame which was not for us**
 
+For an incorrect frame (parity or checksum error, invalid control byte or length) KNX 03_02_02 2.4.2 requires a NAK from
+the addressed device. We deliberately send none: the address fields of a faulty frame are not reliable, so a NAK could
+come from a device that is not addressed. The sender gets no acknowledge within its timeout and repeats the frame with
+the same repetition count as after a NAK.
+
 Changes: Oct 2021 by Horst Rauch
 - cleanup of some unused states and idle, convey error-result/status of a RX/TX process on the bus to the com-object level
 - added some comments

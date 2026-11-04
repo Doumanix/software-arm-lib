@@ -508,6 +508,10 @@ void Bus::handleTelegram(const bool valid)
 #ifndef BUSMONITOR // no processing if we are in monitor mode
 
     // Received a valid telegram with correct checksum and valid control byte (normal data frame with preamble bits)?
+    // A faulty frame (parity or checksum error, invalid control byte or length) is deliberately not answered with a NAK
+    // although KNX 03_02_02 2.4.2 says "shall send NAK": its address fields are not reliable, so the NAK could come from
+    // a device that is not addressed. The sender gets no acknowledge within the timeout and repeats with the same
+    // repetition count as after a NAK.
 #if SBLIB_MAX_APDU_LENGTH > 15
     // Standard or extended frame, the length matches the length field
     if (nextByteIndex >= 8 && valid && isValidDataFrame(rx_telegram, nextByteIndex, rx_error))
