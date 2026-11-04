@@ -116,7 +116,8 @@ public:
      * @param sendBuffer    Pointer to the buffer for a potential response telegram
      * @return True if a response telegram was prepared, otherwise false
      */
-    bool processApci(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength, uint8_t* sendBuffer) override;
+    bool processApci(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength,
+                     uint8_t* sendBuffer) override;
 
     /**
       * @brief Performs a system reset by calling @ref NVIC_SystemReset
@@ -185,12 +186,13 @@ protected:
     /**
      * Process a group address (T_Data_Group) telegram.
      */
-    bool processGroupAddressTelegram(ApciCommand apciCmd, uint16_t groupAddress, unsigned char* telegram, uint8_t telLength) override;
+    bool processGroupAddressTelegram(ApciCommand apciCmd, uint16_t groupAddress, unsigned char* telegram,
+                                     TelegramLength telLength) override;
 
     /**
      * Process a broadcast telegram.
      */
-    bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength) override;
+    bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength) override;
 
     /**
      * Process a device-descriptor-read request.

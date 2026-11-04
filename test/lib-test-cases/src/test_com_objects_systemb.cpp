@@ -93,6 +93,8 @@ namespace
         void receiveWrite(const int addr, const int value)
         {
             uint8_t telegram[9] = {};
+            // standard frame control byte, otherwise telegramTpciIndex() treats the telegram as an extended frame
+            telegram[0] = 0xBC;
             telegram[8] = value;
             bcu.comObjects->processGroupTelegram(addr, APCI_GROUP_VALUE_WRITE_PDU, telegram);
         }

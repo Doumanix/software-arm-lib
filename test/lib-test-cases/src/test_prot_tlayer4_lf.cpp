@@ -43,15 +43,22 @@ TEST_CASE("APCI access in an extended frame", "[SBLIB][KNX][APCI][lf]")
     CHECK(apciCommand(telegram) == APCI_GROUP_VALUE_WRITE_PDU + 1);
 }
 
-TEST_CASE("APCI of a send buffer without control field", "[SBLIB][KNX][APCI][lf]")
+TEST_CASE("APCI of a send buffer follows the control field", "[SBLIB][KNX][APCI][lf]")
 {
-    // Connected responses get their control field after processApci(): the APCI is written to the
-    // octets 6 and 7 of a standard frame, independent of the control field.
+    // Send buffers get their control field before the APCI is written
     uint8_t sendBuffer[10] = {};
+    initLpdu(sendBuffer, PRIORITY_LOW, false, FRAME_STANDARD);
     setApciCommand(sendBuffer, APCI_DEVICEDESCRIPTOR_RESPONSE_PDU, 0);
     CHECK(sendBuffer[6] == 0x03);
     CHECK(sendBuffer[7] == 0x40);
     CHECK(sendBuffer[8] == 0x00);
+
+    uint8_t extended[10] = {};
+    initLpdu(extended, PRIORITY_LOW, false, FRAME_EXTENDED);
+    setApciCommand(extended, APCI_DEVICEDESCRIPTOR_RESPONSE_PDU, 0);
+    CHECK(extended[6] == 0x00);
+    CHECK(extended[7] == 0x03);
+    CHECK(extended[8] == 0x40);
 }
 
 namespace
@@ -59,6 +66,13 @@ namespace
 
     constexpr uint16_t ownAddress = 0xA000;    // 10.0.0
     constexpr uint16_t remoteAddress = 0xA001; // 10.0.1
+
+    // BCU 1 tables (offsets in the user EEPROM at 0x100): group address 1/0/1 is assigned to object 0,
+    // a 2-octet object with its value at RAM 0x10 and the RAM flags at 0x80
+    constexpr uint8_t assocTabPtr = 0x40;
+    constexpr uint8_t commsTabPtr = 0x50;
+    constexpr uint8_t objectValueRam = 0x10;
+    constexpr uint8_t objectFlagsRam = 0x80;
 
     /**
      * BCU 1 that counts the calls of the application layer.
@@ -70,20 +84,21 @@ namespace
         unsigned int groupCount = 0;
         unsigned int broadcastCount = 0;
 
-        bool processApci(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength, uint8_t* sendBuffer) override
+        bool processApci(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength,
+                         uint8_t* sendBuffer) override
         {
             apciCount++;
             return BCU1::processApci(apciCmd, telegram, telLength, sendBuffer);
         }
 
         bool processGroupAddressTelegram(ApciCommand apciCmd, uint16_t groupAddress, unsigned char* telegram,
-                                         uint8_t telLength) override
+                                         TelegramLength telLength) override
         {
             groupCount++;
             return BCU1::processGroupAddressTelegram(apciCmd, groupAddress, telegram, telLength);
         }
 
-        bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength) override
+        bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength) override
         {
             broadcastCount++;
             return BCU1::processBroadCastTelegram(apciCmd, telegram, telLength);
@@ -100,6 +115,8 @@ namespace
         unsigned int apciCount;
         unsigned int groupCount;
         unsigned int broadcastCount;
+        unsigned int objectValue;
+        bool objectUpdated;
     };
 
     LfState lfState[2];
@@ -114,6 +131,8 @@ namespace
         LfS(state)->apciCount = probe->apciCount;
         LfS(state)->groupCount = probe->groupCount;
         LfS(state)->broadcastCount = probe->broadcastCount;
+        LfS(state)->objectValue = probe->comObjects->objectRead(0);
+        LfS(state)->objectUpdated = (probe->comObjects->objectFlagsTable()[0] & COMFLAG_UPDATE) != 0;
 
         if (refState)
         {
@@ -123,6 +142,8 @@ namespace
             REQUIRE(LfS(state)->apciCount == LfS(refState)->apciCount);
             REQUIRE(LfS(state)->groupCount == LfS(refState)->groupCount);
             REQUIRE(LfS(state)->broadcastCount == LfS(refState)->broadcastCount);
+            REQUIRE(LfS(state)->objectValue == LfS(refState)->objectValue);
+            REQUIRE(LfS(state)->objectUpdated == LfS(refState)->objectUpdated);
         }
     }
 
@@ -164,6 +185,13 @@ namespace
         LfS(state)->groupCount++;
     }
 
+    void lfGroupValueWritten(void* state, const unsigned int param)
+    {
+        LfS(state)->groupCount++;
+        LfS(state)->objectValue = param;
+        LfS(state)->objectUpdated = true;
+    }
+
     void lfBroadcastProcessed(void* state, [[maybe_unused]] const unsigned int param)
     {
         LfS(state)->broadcastCount++;
@@ -177,68 +205,116 @@ namespace
     void tcSetup(Telegram* tel, const uint16_t telCount)
     {
         bcuUnderTest->setOwnAddress(ownAddress);
+
+        uint8_t* eeprom = bcuUnderTest->userEeprom->userEepromData;
+        bcuUnderTest->userEeprom->addrTabSize() = 2; // the individual address and 1/0/1
+        eeprom[0x19] = 0x08;
+        eeprom[0x1A] = 0x01;
+        bcuUnderTest->userEeprom->assocTabPtr() = assocTabPtr;
+        eeprom[assocTabPtr] = 1;     // one association
+        eeprom[assocTabPtr + 1] = 1; // address table index of 1/0/1
+        eeprom[assocTabPtr + 2] = 0; // object 0
+        bcuUnderTest->userEeprom->commsTabPtr() = commsTabPtr;
+        eeprom[commsTabPtr] = 1; // one object
+        eeprom[commsTabPtr + 1] = objectFlagsRam;
+        eeprom[commsTabPtr + 2] = objectValueRam;
+        eeprom[commsTabPtr + 3] = COMCONF_WRITE_COMM;
+        eeprom[commsTabPtr + 4] = BYTE_2;
+
+        bcuUnderTest->setProgrammingMode(true);
         telegramPreparation(bcuUnderTest, tel, telCount);
     }
 
-    // Connection with extended frames from 10.0.1 to 10.0.0. The TL4 reads source address,
-    // TPCI and sequence number of the extended frames, the application layer gets none of them.
+    void tcSetupBcu2(Telegram* tel, const uint16_t telCount)
+    {
+        bcuUnderTest->setOwnAddress(ownAddress);
+        telegramPreparation(bcuUnderTest, tel, telCount);
+    }
+
+    // Connection with extended frames from 10.0.1 to 10.0.0. The application layer reads the APDU of the
+    // extended frames, the responses are standard frames.
     Telegram lfConnectedTelegrams[] =
     {
         // 1. Extended T_Connect: CTRL system priority, CTRLE individual address, hop count 6, length 0, TPCI
         {TEL_RX,  8, 0, remoteAddress, lfConnected, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0x80}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 2. Extended T_Data_Connected seq 0 with APDU length 20 (A_DeviceDescriptor_Read and 19 octets)
-        {TEL_RX, 28, 0, 1, lfSeqNoRcv, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 20, 0x43, 0x00}},
-        // T_ACK seq 0, but no response
-        {TEL_TX,  7, 1, 1, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
-        {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 3. Extended T_Data_Connected seq 1 -> T_ACK seq 1
-        {TEL_RX, 28, 0, 2, lfSeqNoRcv, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 20, 0x47, 0x00}},
-        {TEL_TX,  7, 1, 2, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC6}},
-        {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 4. Repetition of seq 1 (event E05) -> T_ACK seq 1 again, receive sequence number unchanged
-        {TEL_RX, 28, 0, 2, lfSeqNoRcv, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 20, 0x47, 0x00}},
-        {TEL_TX,  7, 1, 2, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC6}},
-        {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 5. Standard T_Data_Connected seq 2, A_DeviceDescriptor_Read -> T_ACK seq 2 and the response
-        {TEL_RX,  8, 0, 3, lfApciProcessed, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, 0x4B, 0x00}},
-        {TEL_TX,  7, 1, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xCA}},
-        {TEL_TX, 10, 0, 0, lfOpenWait, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x63, 0x43, 0x40, dummyMaskVersionHigh,
-                                        dummyMaskVersionLow}},
-        // 6. Extended T_ACK seq 0 for the response
+        // 2. Extended T_Data_Connected seq 0, A_Memory_Read count 2 from 0x0105 (device type)
+        {TEL_RX, 11, 0, 1, lfApciProcessed, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x03, 0x42, 0x02, 0x01, 0x05}},
+        // T_ACK seq 0 and the standard A_Memory_Response seq 0
+        {TEL_TX,  7, 1, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+        {TEL_TX, 12, 0, 0, lfOpenWait, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x65, 0x42, 0x42, 0x01, 0x05, 0x20, 0x60}},
+        // 3. Extended T_ACK seq 0 for the response
         {TEL_RX,  8, 0, 0, lfOpenIdle, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0xC2}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 7. Extended T_Disconnect
+        // 4. Extended T_Data_Connected seq 1 with APDU length 20 (A_DeviceDescriptor_Read and 19 octets)
+        {TEL_RX, 28, 0, 2, lfApciProcessed, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 20, 0x47, 0x00}},
+        // T_ACK seq 1 and the standard A_DeviceDescriptor_Response seq 1
+        {TEL_TX,  7, 1, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC6}},
+        {TEL_TX, 10, 0, 0, lfOpenWait, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x63, 0x47, 0x40, dummyMaskVersionHigh,
+                                        dummyMaskVersionLow}},
+        {TEL_RX,  8, 0, 0, lfOpenIdle, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0xC6}},
+        {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
+        // 5. Repetition of seq 1 (event E05) -> T_ACK seq 1 again, no second response
+        {TEL_RX, 28, 0, 2, lfSeqNoRcv, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 20, 0x47, 0x00}},
+        {TEL_TX,  7, 1, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC6}},
+        {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
+        // 6. Standard T_Data_Connected seq 2, A_DeviceDescriptor_Read -> T_ACK seq 2 and the response seq 2
+        {TEL_RX,  8, 0, 3, lfApciProcessed, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, 0x4B, 0x00}},
+        {TEL_TX,  7, 1, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xCA}},
+        {TEL_TX, 10, 0, 0, lfOpenWait, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x63, 0x4B, 0x40, dummyMaskVersionHigh,
+                                        dummyMaskVersionLow}},
+        // 7. Extended T_ACK seq 2 for the response
+        {TEL_RX,  8, 0, 0, lfOpenIdle, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0xCA}},
+        {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
+        // 8. Extended T_Disconnect
         {TEL_RX,  8, 0, 0, lfDisconnected, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0x81}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
         {END, 0, 0, 0, nullptr, {0}}
     };
 
-    // Connectionless extended frames: the TL4 reads the address type, the application layer gets none of them.
+    // Connectionless extended frames reach the application layer, the responses are standard frames.
     Telegram lfConnectionlessTelegrams[] =
     {
-        // 1. Standard A_GroupValue_Write to 1/0/1 reaches the application layer
-        {TEL_RX,  8, 0, 0, lfGroupProcessed, {0xBC, 0xA0, 0x01, 0x08, 0x01, 0xE1, 0x00, 0x81}},
+        // 1. Standard A_GroupValue_Write 0x1234 to 1/0/1
+        {TEL_RX, 10, 0, 0x1234, lfGroupValueWritten, {0xBC, 0xA0, 0x01, 0x08, 0x01, 0xE3, 0x00, 0x80, 0x12, 0x34}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 2. Extended T_Data_Group A_GroupValue_Write to 1/0/1 with APDU length 20: CTRLE group address
-        {TEL_RX, 28, 0, 0, nullptr, {0x3C, 0xE0, 0xA0, 0x01, 0x08, 0x01, 20, 0x00, 0x80}},
+        // 2. Extended T_Data_Group A_GroupValue_Write 0x5678 to 1/0/1 with APDU length 20: CTRLE group address
+        {TEL_RX, 28, 0, 0x5678, lfGroupValueWritten, {0x3C, 0xE0, 0xA0, 0x01, 0x08, 0x01, 20, 0x00, 0x80, 0x56,
+                                                      0x78}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
         // 3. Extended frame to group address 0xA000 (same value as the own address) with TPCI 0x80:
-        //    the address type is read from CTRLE, so this is no T_Connect
-        {TEL_RX,  8, 0, 0, nullptr, {0x30, 0xE0, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0x80}},
+        //    the address type is read from CTRLE, so this is a group telegram and no T_Connect
+        {TEL_RX,  8, 0, 0, lfGroupProcessed, {0x30, 0xE0, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0x80}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 4. Standard and extended A_IndividualAddress_Read broadcast
+        // 4. Standard and extended A_IndividualAddress_Read broadcast in programming mode -> standard response
         {TEL_RX,  8, 0, 0, lfBroadcastProcessed, {0xB0, 0xA0, 0x01, 0x00, 0x00, 0xE1, 0x01, 0x00}},
+        {TEL_TX,  8, 0, 0, nullptr, {0xB0, 0xA0, 0x00, 0x00, 0x00, 0xE1, 0x01, 0x40}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        {TEL_RX,  9, 0, 0, nullptr, {0x30, 0xE0, 0xA0, 0x01, 0x00, 0x00, 0x01, 0x01, 0x00}},
+        {TEL_RX,  9, 0, 0, lfBroadcastProcessed, {0x30, 0xE0, 0xA0, 0x01, 0x00, 0x00, 0x01, 0x01, 0x00}},
+        {TEL_TX,  8, 0, 0, nullptr, {0xB0, 0xA0, 0x00, 0x00, 0x00, 0xE1, 0x01, 0x40}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 5. Extended T_Data_Individual A_DeviceDescriptor_Read: no call, no response
-        {TEL_RX,  9, 0, 0, nullptr, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x01, 0x03, 0x00}},
+        // 5. Extended T_Data_Individual A_DeviceDescriptor_Read -> standard response
+        {TEL_RX,  9, 0, 0, lfIndividualProcessed, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x01, 0x03, 0x00}},
+        {TEL_TX, 10, 0, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x63, 0x03, 0x40, dummyMaskVersionHigh,
+                                     dummyMaskVersionLow}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 6. The same as standard frame is answered
+        // 6. The same as standard frame gets the same response
         {TEL_RX,  8, 0, 0, lfIndividualProcessed, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, 0x03, 0x00}},
         {TEL_TX, 10, 0, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x63, 0x03, 0x40, dummyMaskVersionHigh,
                                      dummyMaskVersionLow}},
+        {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
+        {END, 0, 0, 0, nullptr, {0}}
+    };
+
+    // BCU 2: extended A_PropertyValue_Read of PID_MANUFACTURER_ID (device object), standard response
+    Telegram lfPropertyTelegrams[] =
+    {
+        {TEL_RX,  8, 0, 0, nullptr, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0x80}},
+        {TEL_RX, 13, 0, 0, nullptr, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x05, 0x43, 0xD5, 0x00, 0x0C, 0x10, 0x01}},
+        {TEL_TX,  7, 1, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+        {TEL_TX, 14, 0, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x67, 0x43, 0xD6, 0x00, 0x0C, 0x10, 0x01, 0x00,
+                                     0x04}},
+        {TEL_RX,  8, 0, 0, nullptr, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0xC2}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
         {END, 0, 0, 0, nullptr, {0}}
     };
@@ -269,6 +345,19 @@ namespace
         lfConnectionlessTelegrams
     };
 
+    Test_Case lfPropertyTestCase =
+    {
+        "BCU 2 property value read with an extended frame",
+        0x0004, 0x2060, 0x01,
+        0,       // powerOnDelay
+        nullptr, // eepromSetup
+        tcSetupBcu2,
+        nullptr,
+        nullptr,
+        nullptr,
+        lfPropertyTelegrams
+    };
+
     void executeOnProbe(Test_Case* tc)
     {
         probe = new Bcu1ApplicationLayerProbe();
@@ -281,13 +370,17 @@ namespace
 
 TEST_CASE("Transport layer 4 with extended frames", "[protocol][L4][lf]")
 {
-    SECTION("Connection, sequence numbers and repetition")
+    SECTION("Connection, memory read, sequence numbers and repetition")
     {
         executeOnProbe(&lfConnectedTestCase);
     }
     SECTION("Group, broadcast and individual frames")
     {
         executeOnProbe(&lfConnectionlessTestCase);
+    }
+    SECTION("BCU 2 property value read")
+    {
+        executeTest(BCU_2, &lfPropertyTestCase);
     }
 }
 

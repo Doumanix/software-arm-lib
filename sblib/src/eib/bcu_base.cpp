@@ -159,7 +159,8 @@ bool BcuBase::setProgrammingMode(const bool newMode)
     return true;
 }
 
-bool BcuBase::processApci(const ApciCommand apciCmd, unsigned char* telegram, const uint8_t telLength, uint8_t* sendBuffer)
+bool BcuBase::processApci(const ApciCommand apciCmd, unsigned char* telegram, const TelegramLength telLength,
+                          uint8_t* sendBuffer)
 {
     switch (apciCmd)
     {
