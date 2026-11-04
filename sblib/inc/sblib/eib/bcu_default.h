@@ -12,7 +12,7 @@
 
 #include <sblib/mem_mapper.h>
 #include <sblib/usr_callback.h>
-#include <sblib/eib/userEeprom.h>
+#include <sblib/eib/userEepromBCU1.h>
 #include <sblib/eib/bcu_base.h>
 
 /**
@@ -24,7 +24,7 @@
 class BcuDefault : public BcuBase
 {
 public:
-    BcuDefault(UserRam* userRam, UserEeprom* userEeprom, ComObjects* comObjects, AddrTables* addrTables);
+    BcuDefault(UserRam* userRam, UserEepromBCU1* userEeprom, ComObjects* comObjects, AddrTables* addrTables);
     BcuDefault() = delete;
 
     /**
@@ -127,7 +127,7 @@ public:
       */
     void softSystemReset() override;
 
-    UserEeprom* userEeprom;
+    UserEepromBCU1* userEeprom;
 
     uint8_t* userMemoryPtr(unsigned int addr) const;
 
