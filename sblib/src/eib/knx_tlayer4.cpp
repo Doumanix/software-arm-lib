@@ -644,6 +644,10 @@ void TLayer4::processDirectTelegram(const ApciCommand apciCmd, unsigned char* te
         setDestinationAddress(sendBuffer, senderAddr);
         if (processApci(apciCmd, telegram, telLength, sendBuffer))
         {
+#if SBLIB_MAX_APDU_LENGTH > 15
+            // The application layer chooses the frame format of the response, the destination follows it
+            lpduSetDestinationAddress(sendBuffer, senderAddr);
+#endif
             sendPreparedTelegram();
         }
         else
@@ -789,9 +793,15 @@ void TLayer4::actionA02sendAckPduAndProcessApci(const ApciCommand apciCmd, const
     const auto sendResponse = processApci(apciCmd, telegram, telLength, sendBuffer);
     if (sendResponse)
     {
+#if SBLIB_MAX_APDU_LENGTH > 15
+        // The application layer chooses the frame format of the response, keep it
+        setPriority(sendBuffer, priority(telegram)); // same priority as received
+        lpduSetDestinationAddress(sendBuffer, connectedAddr);
+#else
         ///\todo normally this has to be done in Layer 2
         initLpdu(sendBuffer, priority(telegram), false, FRAME_STANDARD); // same priority as received
         setDestinationAddress(sendBuffer, connectedAddr);
+#endif
         const auto sequenceNumber = (sendBuffer == sendConnectedTelegram) ? seqNoSend : ((seqNoSend + 1) & 0x0F);
         setSequenceNumber(sendBuffer, sequenceNumber);
     }
