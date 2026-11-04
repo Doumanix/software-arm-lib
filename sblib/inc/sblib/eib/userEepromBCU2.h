@@ -61,8 +61,8 @@ public:
         return setUInt8(startAddr() + orderInfoOffset + index, value);
     }
     bool setEibObjCount(const uint8_t value) { return setUInt8(startAddr() + eibObjCountOffset, value); }
-    bool setAddrTabAddr(const uint16_t value) { return setShadow16(addrTabAddrOffset, value); }
-    bool setAssocTabAddr(const uint16_t value) { return setShadow16(assocTabAddrOffset, value); }
+    virtual bool setAddrTabAddr(const uint16_t value) { return setShadow16(addrTabAddrOffset, value); }
+    virtual bool setAssocTabAddr(const uint16_t value) { return setShadow16(assocTabAddrOffset, value); }
     bool setLoadState(const uint32_t objectIdx, const uint8_t value)
     {
         return setUInt8(startAddr() + loadStateOffset + objectIdx, value);
@@ -74,13 +74,14 @@ protected:
        :
         UserEepromBCU1(start, size, flashSize) {}
 
-private:
+    /// Writes a 16 bit field at the given offset from the start address, low byte first like the getters
     bool setShadow16(const uint32_t offset, const uint16_t value)
     {
         const uint8_t bytes[2] = {static_cast<uint8_t>(value & 0xff), static_cast<uint8_t>(value >> 8)};
         return write(startAddr() + offset, bytes, 2);
     }
 
+private:
     ///\todo refactor PropertiesBCU2, so that it doesn't need to access private members of UserEepromBCU2,
     ///      then remove this friend declaration
     friend class PropertiesBCU2;
