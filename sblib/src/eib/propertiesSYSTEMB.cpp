@@ -16,6 +16,7 @@
 #include <sblib/eib/propertiesSYSTEMB.h>
 #include <sblib/eib/systemb.h>
 #include <sblib/eib/bus.h>
+#include <sblib/eib/knx_npdu.h>
 
 /**
  * NOT IMPLEMENTED!
@@ -359,12 +360,14 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
     uint8_t* valuePtr = def->valuePointer(bcu);
     Memory* memory = def->valueMemory(bcu);
 
-    const uint8_t* data = bcu->bus->telegram + 12;
+    // A_PropertyValue_Write has the TPCI in octet 6 of a standard and in octet 7 of an extended frame
+    const int dataIndex = telegramTpciIndex(bcu->bus->telegram) + 6;
+    const uint8_t* data = bcu->bus->telegram + dataIndex;
     int len;
 
     if (type == PDT_CONTROL)
     {
-        len = bcu->bus->telegramLen - 13;
+        len = bcu->bus->telegramLen - (dataIndex + 1);
         const int state = loadProperty(objectIdx, data, len);
         bcu->userEeprom->setLoadState(objectIdx, state);
         sendBuffer[12] = state;

@@ -319,6 +319,21 @@ namespace
         {END, 0, 0, 0, nullptr, {0}}
     };
 
+    // BCU 2 and SYSTEM B: extended A_PropertyValue_Write of PID_HARDWARE_TYPE (6 octets), the data starts one octet
+    // later than in a standard frame. The standard response contains the stored value.
+    Telegram lfPropertyWriteTelegrams[] =
+    {
+        {TEL_RX,  8, 0, 0, nullptr, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0x80}},
+        {TEL_RX, 19, 0, 0, nullptr, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x0B, 0x43, 0xD7, 0x00, 0x4E, 0x10, 0x01,
+                                     0x01, 0x02, 0x03, 0x04, 0x05, 0x06}},
+        {TEL_TX,  7, 1, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, 0xC2}},
+        {TEL_TX, 18, 0, 0, nullptr, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x6B, 0x43, 0xD6, 0x00, 0x4E, 0x10, 0x01, 0x01,
+                                     0x02, 0x03, 0x04, 0x05, 0x06}},
+        {TEL_RX,  8, 0, 0, nullptr, {0x30, 0x60, 0xA0, 0x01, 0xA0, 0x00, 0x00, 0xC2}},
+        {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
+        {END, 0, 0, 0, nullptr, {0}}
+    };
+
     Test_Case lfConnectedTestCase =
     {
         "TL4 connection with extended frames",
@@ -358,6 +373,19 @@ namespace
         lfPropertyTelegrams
     };
 
+    Test_Case lfPropertyWriteTestCase =
+    {
+        "property value write with an extended frame",
+        0x0004, 0x2060, 0x01,
+        0,       // powerOnDelay
+        nullptr, // eepromSetup
+        tcSetupBcu2,
+        nullptr,
+        nullptr,
+        nullptr,
+        lfPropertyWriteTelegrams
+    };
+
     void executeOnProbe(Test_Case* tc)
     {
         probe = new Bcu1ApplicationLayerProbe();
@@ -381,6 +409,14 @@ TEST_CASE("Transport layer 4 with extended frames", "[protocol][L4][lf]")
     SECTION("BCU 2 property value read")
     {
         executeTest(BCU_2, &lfPropertyTestCase);
+    }
+    SECTION("BCU 2 property value write")
+    {
+        executeTest(BCU_2, &lfPropertyWriteTestCase);
+    }
+    SECTION("SYSTEM B property value write")
+    {
+        executeTest(BCU_07B0, &lfPropertyWriteTestCase);
     }
 }
 

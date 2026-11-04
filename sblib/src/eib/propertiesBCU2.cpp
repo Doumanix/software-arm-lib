@@ -16,6 +16,7 @@
 #include <sblib/eib/propertiesBCU2.h>
 #include <sblib/eib/bcu2.h>
 #include <sblib/eib/bus.h>
+#include <sblib/eib/knx_npdu.h>
 
 #define HIGH_RAM_START 0x0900
 #define HIGH_RAM_LENGTH 0xBC
@@ -537,11 +538,13 @@ bool PropertiesBCU2::propertyValueWriteTelegram(const int objectIdx, const Prope
     uint8_t* valuePtr = def->valuePointer(bcu);
     Memory* memory = def->valueMemory(bcu);
 
-    const uint8_t* data = bcu->bus->telegram + 12;
+    // A_PropertyValue_Write has the TPCI in octet 6 of a standard and in octet 7 of an extended frame
+    const int dataIndex = telegramTpciIndex(bcu->bus->telegram) + 6;
+    const uint8_t* data = bcu->bus->telegram + dataIndex;
     int len;
     if (type == PDT_CONTROL)
     {
-        len = bcu->bus->telegramLen - 13;
+        len = bcu->bus->telegramLen - (dataIndex + 1);
         const int state = loadProperty(objectIdx, data, len);
         bcu->userEeprom->setLoadState(objectIdx, state);
         sendBuffer[12] = state;
@@ -564,7 +567,7 @@ bool PropertiesBCU2::propertyValueWriteTelegram(const int objectIdx, const Prope
         --start;
         const int size = def->size();
         len = count * size;
-        if ((len > 10) || (len > (bcu->bus->telegramLen - 13)))
+        if ((len > 10) || (len > (bcu->bus->telegramLen - (dataIndex + 1))))
         {
             return false; // data does not fit into the telegram
         }
