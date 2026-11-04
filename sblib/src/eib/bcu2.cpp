@@ -10,6 +10,7 @@
 
 #include "sblib/eib/bcu2.h"
 #include "sblib/eib/knx_lpdu.h"
+#include "sblib/eib/knx_npdu.h"
 #include "sblib/eib/serial_number.h"
 #include "sblib/internal/iap.h"
 #include "sblib/bits.h"
@@ -125,18 +126,18 @@ bool BCU2::processApci(const ApciCommand apciCmd, unsigned char* telegram, const
     {
         case APCI_PROPERTY_VALUE_READ_PDU:
         case APCI_PROPERTY_VALUE_WRITE_PDU:
-            index = telegram[8];
-            id = telegram[9];
-            count = telegram[10] >> 4;
-            address = ((telegram[10] & 0x0f) << 4);
-            address = (uint16_t)(address | (telegram[11]));
+            index = telegram[telegramTpciIndex(telegram) + 2];
+            id = telegram[telegramTpciIndex(telegram) + 3];
+            count = telegram[telegramTpciIndex(telegram) + 4] >> 4;
+            address = ((telegram[telegramTpciIndex(telegram) + 4] & 0x0f) << 4);
+            address = (uint16_t)(address | (telegram[telegramTpciIndex(telegram) + 5]));
 
             sendBuffer[5] = 0x60 + 5; // routing count in high nibble + response length in low nibble
             setApciCommand(sendBuffer, APCI_PROPERTY_VALUE_RESPONSE_PDU, 0);
             sendBuffer[8] = index;
             sendBuffer[9] = id;
-            sendBuffer[10] = telegram[10];
-            sendBuffer[11] = telegram[11];
+            sendBuffer[10] = telegram[telegramTpciIndex(telegram) + 4];
+            sendBuffer[11] = telegram[telegramTpciIndex(telegram) + 5];
 
             if (apciCmd == APCI_PROPERTY_VALUE_READ_PDU)
                 found = properties->propertyValueReadTelegram(index, (PropertyID)id, count, address, sendBuffer);
@@ -147,9 +148,9 @@ bool BCU2::processApci(const ApciCommand apciCmd, unsigned char* telegram, const
             return (true);
 
         case APCI_PROPERTY_DESCRIPTION_READ_PDU:
-            index = telegram[8];
-            id = telegram[9];
-            address = telegram[10];
+            index = telegram[telegramTpciIndex(telegram) + 2];
+            id = telegram[telegramTpciIndex(telegram) + 3];
+            address = telegram[telegramTpciIndex(telegram) + 4];
             sendBuffer[5] = 0x60 + 8; // routing count in high nibble + response length in low nibble
             setApciCommand(sendBuffer, APCI_PROPERTY_DESCRIPTION_RESPONSE_PDU, 0);
             sendBuffer[8] = index;
@@ -182,13 +183,15 @@ bool BCU2::processBroadCastTelegram(const ApciCommand apciCmd, unsigned char* te
     switch (apciCmd)
     {
         case APCI_INDIVIDUALADDRESS_SERIALNUMBER_WRITE_PDU:
-            // telegram[8-13] contains serial number to check, telegram[14-15] = new physical address
-            if (memcmp(&telegram[8], &userEeprom->serial()[0], userEeprom->serialSize()) != 0)
+            // octets 2-7 after the TPCI contain the serial number to check, octets 8-9 the new physical address
+            if (memcmp(&telegram[telegramTpciIndex(telegram) + 2], &userEeprom->serial()[0],
+                       userEeprom->serialSize()) != 0)
             {
                 return (false);
             }
 
-            setOwnAddress(makeWord(telegram[14], telegram[15]));
+            setOwnAddress(makeWord(telegram[telegramTpciIndex(telegram) + 8],
+                                   telegram[telegramTpciIndex(telegram) + 9]));
             if (userEeprom->isModified())
             {
                 while (bus->sendingFrame()) // ensure L2 ack is sent, before calling noInterrupts()
@@ -198,8 +201,9 @@ bool BCU2::processBroadCastTelegram(const ApciCommand apciCmd, unsigned char* te
             break;
 
         case APCI_INDIVIDUALADDRESS_SERIALNUMBER_READ_PDU:
-            // telegram[8-13] contains serial number to check
-            if (memcmp(&telegram[8], &userEeprom->serial()[0], userEeprom->serialSize()) != 0)
+            // octets 2-7 after the TPCI contain the serial number to check
+            if (memcmp(&telegram[telegramTpciIndex(telegram) + 2], &userEeprom->serial()[0],
+                       userEeprom->serialSize()) != 0)
             {
                 return (false);
             }
