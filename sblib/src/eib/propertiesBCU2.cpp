@@ -505,7 +505,7 @@ bool PropertiesBCU2::propertyValueReadTelegram(const int objectIdx, const Proper
     --start;
     const int size = def->size();
     const int len = count * size;
-    if (len > 10)
+    if (len > PROPERTY_MAX_VALUE_LENGTH)
         return false; // length error
 
     if (type < PDT_CHAR_BLOCK)
@@ -567,7 +567,7 @@ bool PropertiesBCU2::propertyValueWriteTelegram(const int objectIdx, const Prope
         --start;
         const int size = def->size();
         len = count * size;
-        if ((len > 10) || (len > (bcu->bus->telegramLen - (dataIndex + 1))))
+        if ((len > PROPERTY_MAX_VALUE_LENGTH) || (len > (bcu->bus->telegramLen - (dataIndex + 1))))
         {
             return false; // data does not fit into the telegram
         }

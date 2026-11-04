@@ -16,6 +16,7 @@
 #include <sblib/libconfig.h>
 
 #include <sblib/eib/property_types.h>
+#include <sblib/eib/bcu_const.h>
 #ifdef DUMP_PROPERTIES
 #   include <sblib/serial.h>
 #endif
@@ -37,6 +38,13 @@ constexpr uint8_t PID_LOAD_STATE_CONTROL_LENGTH = 10;
 #define DMP_LOADSTATE_MACHINE_WRITE_RCO_MEM_PAYLOAD_OFFSET 3    //!> offset for RCo_Mem mode, where the real data for Additional Load Controls starts
 
 #define DMP_LOADSTATE_MACHINE_WRITE_RCO_PAYLOAD_LENGTH 7        //!> the length of the payload for both implementations
+
+/**
+ * Largest property value of an A_PropertyValue_Response or A_PropertyValue_Write in octets: the APDU holds 5 octets
+ * before the value (KNX 3/3/7 3.4.4), so the maximum APDU length - 5, which also fits into the telegram buffer.
+ * 10 with the default SBLIB_MAX_APDU_LENGTH 15.
+ */
+#define PROPERTY_MAX_VALUE_LENGTH (SBLIB_MAX_APDU_LENGTH - 5)
 
 
 /** Number of interface/property objects */

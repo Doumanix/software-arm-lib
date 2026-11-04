@@ -321,7 +321,7 @@ bool PropertiesSYSTEMB::propertyValueReadTelegram(const int objectIdx, const Pro
     --start;
     const int size = def->size();
     int len = count * size;
-    if (len > 12)
+    if (len > PROPERTY_MAX_VALUE_LENGTH)
         return false; // length error
 
     if (type == PDT_UNSIGNED_LONG)
@@ -378,6 +378,11 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
         --start;
         const int size = def->size();
         len = count * size;
+        if ((len > PROPERTY_MAX_VALUE_LENGTH) || (len > (bcu->bus->telegramLen - (dataIndex + 1))))
+        {
+            return false; // data does not fit into the telegram
+        }
+
         DB_PROPERTIES(serial.print("propertyValueWriteTelegram: "); printObjectIdx(objectIdx); serial.print(" "); printPropertyID(propertyId); serial.println(););
         if (type >= PDT_CHAR_BLOCK) // byte arrays are stored in telegram order, like in propertyValueReadTelegram()
         {
