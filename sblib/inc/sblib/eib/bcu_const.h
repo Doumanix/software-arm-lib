@@ -26,6 +26,12 @@ static_assert(SBLIB_MAX_APDU_LENGTH >= 15 && SBLIB_MAX_APDU_LENGTH <= 254, "SBLI
     constexpr uint16_t TelegramBufferSize = 23; //!> TL4, Tx/Rx KNX telegram buffer size in bytes to allocate
 #endif
 
+#if SBLIB_MAX_APDU_LENGTH > 15
+    using TelegramLength = uint16_t; //!> Length of a telegram in octets, an extended frame has up to 263 octets
+#else
+    using TelegramLength = uint8_t;  //!> Length of a telegram in octets
+#endif
+
 /**
  * BCU status bits for @ref status()
  * See BCU1 / BCU2 help for detailed description.

@@ -12,6 +12,7 @@
 #include "sblib/digital_pin.h"
 #include "sblib/io_pin_names.h"
 #include "sblib/eib/knx_lpdu.h"
+#include "sblib/eib/knx_npdu.h"
 #include "sblib/eib/bcu_const.h"
 #include "sblib/bits.h"
 #include "sblib/eib/callback_bcu.h"
@@ -85,7 +86,7 @@ void BcuBase::loop()
     //
     if (bus->telegramReceived() && !bus->sendingFrame() && (layerStatus() & BCU_STATUS_TRANSPORT_LAYER))
     {
-        processTelegram(bus->telegram, (uint8_t)bus->telegramLen); // if processed successfully, received telegram will be discarded by processTelegram()
+        processTelegram(bus->telegram, bus->telegramLen); // if processed successfully, received telegram will be discarded by processTelegram()
     }
 
     if (progPin)
@@ -175,7 +176,8 @@ bool BcuBase::handleIndividualAddressBroadcast(const ApciCommand apciCmd, const 
     switch (apciCmd)
     {
         case APCI_INDIVIDUAL_ADDRESS_WRITE_PDU:
-            setOwnAddress(makeWord(telegram[8], telegram[9]));
+            setOwnAddress(makeWord(telegram[telegramTpciIndex(telegram) + 2],
+                                   telegram[telegramTpciIndex(telegram) + 3]));
             break;
 
         case APCI_INDIVIDUAL_ADDRESS_READ_PDU:

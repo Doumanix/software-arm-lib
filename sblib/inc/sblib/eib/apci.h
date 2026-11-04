@@ -12,6 +12,8 @@
 
 #include <sblib/types.h>
 
+// Octets of the APCI in a standard frame only, telegramTpciIndex() works for both frame formats.
+// Send buffers are always standard frames.
 #define APCI_HIGH_BYTE       (6)
 #define APCI_LOW_BYTE        (7)
 
@@ -142,7 +144,14 @@ enum class RestartType : uint8_t
     MasterIntoBootloader
 };
 
+/**
+ * Get the APCI of a received standard or extended frame, see telegramTpciIndex().
+ */
 ApciCommand apciCommand(unsigned char* telegram);
+
+/**
+ * Write the APCI to the octets 6 and 7 of a standard frame send buffer.
+ */
 void setApciCommand(unsigned char* telegram, ApciCommand newApciCommand, uint8_t additionalData);
 
 
