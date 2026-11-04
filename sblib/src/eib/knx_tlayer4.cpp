@@ -278,26 +278,12 @@ void TLayer4::processTelegramInternal(unsigned char* telegram, const TelegramLen
     if (destAddr == 0)
     {
         // a broadcast telegram
-#if SBLIB_MAX_APDU_LENGTH > 15
-        // The application layer (processApci(), processBroadCastTelegram(), processGroupAddressTelegram())
-        // still reads the octets of a standard frame. Until phase 3b it gets no extended frames.
-        if (isExtendedFrame(telegram))
-        {
-            return;
-        }
-#endif
         processBroadCastTelegram(apciCmd, telegram, telLength);
         return;
     }
     else if (telegramIsGroupAddress(telegram))
     {
         // a group address telegram
-#if SBLIB_MAX_APDU_LENGTH > 15
-        if (isExtendedFrame(telegram))
-        {
-            return; // no application layer for extended frames until phase 3b
-        }
-#endif
         processGroupAddressTelegram(apciCmd, destAddr, telegram, telLength);
         return;
     }
@@ -653,12 +639,6 @@ void TLayer4::processDirectTelegram(const ApciCommand apciCmd, unsigned char* te
     if (tpci == 0)
     {
         // T_Data_Individual-PDU: Allow implementations to overwrite fields (priority, destination)
-#if SBLIB_MAX_APDU_LENGTH > 15
-        if (isExtendedFrame(telegram))
-        {
-            return; // no application layer for extended frames until phase 3b
-        }
-#endif
         const auto sendBuffer = acquireSendBuffer();
         initLpdu(sendBuffer, priority(telegram), false, FRAME_STANDARD); // same priority as received
         setDestinationAddress(sendBuffer, senderAddr);
@@ -782,12 +762,6 @@ void TLayer4::actionA02sendAckPduAndProcessApci(const ApciCommand apciCmd, const
     seqNoRcv &= 0x0F;         // handle overflow
     connectedTime = millis(); // "restart the connection timeout timer"
 
-#if SBLIB_MAX_APDU_LENGTH > 15
-    if (isExtendedFrame(telegram))
-    {
-        return; // acknowledged above, but no application layer for extended frames until phase 3b
-    }
-#endif
 
     uint8_t* sendBuffer;
     volatile SendTelegramBufferState* sendBufferState;
