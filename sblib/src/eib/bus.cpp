@@ -531,7 +531,16 @@ void Bus::handleTelegram(const bool valid)
         {
 #endif
             processTel = (destAddr == 0);                                                          // broadcast
-            processTel |= (addressTable != nullptr) && (addressTable->indexOfAddr(destAddr) >= 0); // known group address
+            if (addressTable != nullptr)
+            {
+                processTel |= (addressTable->indexOfAddr(destAddr) >= 0); // known group address
+                // An address table of length 0 accepts all group addresses (KNX 03_05_01 4.16.3.3.1), the upper layers
+                // find no object for them. Length 1 holds only our own address and accepts none.
+                if (addressTable->addrTable() != nullptr)
+                {
+                    processTel |= (addressTable->addrCount() == 0);
+                }
+            }
         }
         else if (destAddr == ownAddress)
         {

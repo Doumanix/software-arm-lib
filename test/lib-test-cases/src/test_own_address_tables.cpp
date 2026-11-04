@@ -41,6 +41,34 @@ namespace
     };
 } // namespace
 
+TEST_CASE("BCU2 address table count beyond the user memory finds nothing", "[own_address_tables]")
+{
+    IAP_Init_Flash(0xff);
+    BCU2 bcu;
+    constexpr uint16_t LastAddress = 0x04f0; // 16 bytes before the end of the UserEeprom 0x0100..0x04ff
+    bcu.userEeprom->addrTabAddr() = LastAddress;
+    uint8_t* table = bcu.addrTables->addrTable();
+    REQUIRE(table != nullptr);
+    const uint8_t content[] = {0x03, 0x11, 0x65, 0x00, 0x64, 0x00, 0x65};
+    for (unsigned int i = 0; i < sizeof(content); ++i)
+    {
+        table[i] = content[i];
+    }
+
+    SECTION("count inside the memory")
+    {
+        CHECK(bcu.addrTables->indexOfAddr(0x0064) == 1);
+        CHECK(bcu.addrTables->indexOfAddr(0x0065) == 2);
+    }
+
+    SECTION("count whose entries end behind the memory")
+    {
+        table[0] = 0xff;
+        CHECK(bcu.addrTables->indexOfAddr(0x0064) == -1);
+        CHECK(bcu.addrTables->indexOfAddr(0x0065) == -1);
+    }
+}
+
 TEST_CASE("BCU2 stores the individual address in the loading address table", "[own_address_tables]")
 {
     IAP_Init_Flash(0xff);

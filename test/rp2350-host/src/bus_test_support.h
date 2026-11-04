@@ -40,13 +40,43 @@ namespace bustest
             ++finished;
             lastSuccessful = successful;
         }
-        [[nodiscard]] uint8_t getLayerStatus() const override { return layerStatus; }
+        [[nodiscard]] uint8_t getLayerStatus() const override
+        {
+            return layerStatus;
+        }
 
         uint8_t layerStatus = BCU_STATUS_LINK_LAYER | BCU_STATUS_TRANSPORT_LAYER;
         int finished = 0;
         bool lastSuccessful = false;
     };
 
+    // Knows GroupAddress. With a table (tableLength is its first byte, as in BCU1/BCU2) it knows it only from 2 entries on
+    class TestAddrTables : public AddrTables
+    {
+    public:
+        int indexOfAddr(const int addr) override
+        {
+            if (addr == GroupAddress && (!hasTable || tableLength >= 2))
+            {
+                return 1;
+            }
+            return -1;
+        }
+        uint8_t* addrTable() override
+        {
+            if (hasTable)
+            {
+                return &tableLength;
+            }
+            return nullptr;
+        }
+        uint8_t* assocTable() override { return nullptr; }
+
+        bool hasTable = false;
+        uint8_t tableLength = 0;
+    };
+
+    extern TestAddrTables addrTables;
     extern TestCallback callback;
     extern std::unique_ptr<Bus> bus;
 

@@ -1318,8 +1318,8 @@ TEST_CASE("bus acknowledge: with the transport layer off every frame is taken, o
     constexpr uint16_t ForeignAddress = 0x1201;
     const auto toIndividual = [](const uint16_t address)
     {
-        return withChecksum({0xB0, 0x11, 0x02, static_cast<uint8_t>(address >> 8), static_cast<uint8_t>(address & 0xff),
-                             0x60, 0x80});
+        return withChecksum(
+                {0xB0, 0x11, 0x02, static_cast<uint8_t>(address >> 8), static_cast<uint8_t>(address & 0xff), 0x60, 0x80});
     };
     struct Case
     {
@@ -1352,6 +1352,41 @@ TEST_CASE("bus acknowledge: with the transport layer off every frame is taken, o
             CHECK(consumer.received.size() == (c.taken ? 1u : 0u));
             REQUIRE(peer.sent.size() == 1);
             CHECK((peer.acknowledgeOf(peer.sent[0]) != nullptr) == c.acknowledged);
+        }
+    }
+}
+
+TEST_CASE("bus acknowledge: an address table of length 0 accepts all group addresses, length 1 none",
+          "[rp2350][bus][ack]")
+{
+    // KNX 03_05_01 4.16.3.3.1: length 0 accepts and acknowledges every group telegram (the upper layers find no
+    // object), length 1 (only our individual address) none
+    constexpr uint8_t UnknownGroupAddress = GroupAddress + 1;
+    const auto unknownGroupWrite = withChecksum({0xBC, 0x11, 0x02, 0x00, UnknownGroupAddress, 0xE1, 0x00, 0x81});
+    struct Case
+    {
+        uint8_t length;
+        bool known;
+        bool taken;
+    };
+    for (const auto& c: {Case{0, false, true}, Case{1, false, false}, Case{2, true, false}})
+    {
+        DYNAMIC_SECTION("table length " << static_cast<int>(c.length))
+        {
+            startBus();
+            addrTables.hasTable = true;
+            addrTables.tableLength = c.length;
+            Peer peer;
+            peer.attach();
+            Consumer consumer;
+            peer.send(sim::now() + 1000, unknownGroupWrite);
+            peer.send(sim::now() + 60000, remoteGroupWrite());
+            runMain(consumer, 120000);
+            addrTables = TestAddrTables{};
+            REQUIRE(peer.sent.size() == 2);
+            CHECK((peer.acknowledgeOf(peer.sent[0]) != nullptr) == c.taken);
+            CHECK((peer.acknowledgeOf(peer.sent[1]) != nullptr) == (c.length != 1));
+            CHECK(consumer.received.size() == (c.taken ? 1u : 0u) + (c.length != 1 ? 1u : 0u));
         }
     }
 }
