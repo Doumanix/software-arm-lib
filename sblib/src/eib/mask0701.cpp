@@ -47,7 +47,7 @@ bool MASK0701::processApciMemoryWritePDU(const int addressStart, uint8_t* payLoa
         DB_PROPERTIES(serial.println(" LOAD_CONTROL_ADDR: objectIdx:", objectIdx, HEX));
         if (objectIdx < INTERFACE_OBJECT_COUNT)
         {
-            userEeprom->loadState()[objectIdx] = properties->loadProperty(objectIdx, &payLoad[0], lengthPayLoad);
+            userEeprom->setLoadState(objectIdx, properties->loadProperty(objectIdx, &payLoad[0], lengthPayLoad));
             userEeprom->modified(true);
             DB_PROPERTIES(serial.println());
             return true;

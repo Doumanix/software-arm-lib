@@ -57,6 +57,14 @@ public:
     bool setDeviceTypeH(const uint8_t value) { return setUInt8(startAddr() + deviceTypeHOffset, value); }
     bool setDeviceTypeL(const uint8_t value) { return setUInt8(startAddr() + deviceTypeLOffset, value); }
     bool setVersion(const uint8_t value) { return setUInt8(startAddr() + versionOffset, value); }
+    bool setPortADDR(const uint8_t value) { return setUInt8(startAddr() + portADDROffset, value); }
+    bool setRunError(const uint8_t value) { return setUInt8(startAddr() + runErrorOffset, value); }
+    /// Sets the own individual address, which is stored in the first two bytes of the address table (high byte first).
+    bool setOwnAddressInAddrTable(const uint16_t value)
+    {
+        const uint8_t bytes[2] = {static_cast<uint8_t>(value >> 8), static_cast<uint8_t>(value & 0xff)};
+        return write(startAddr() + addrTabOffset, bytes, 2);
+    }
 
 protected:
     // BCU1 has no variable EEPROM start or size, so make this constructor protected

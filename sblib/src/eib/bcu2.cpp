@@ -34,7 +34,7 @@ inline void BCU2::begin(const int manufacturer, const int deviceType, const int 
     BcuDefault::begin(manufacturer, deviceType, version);
 
     userRam->peiType() = 0;    // PEI type: 0=no adapter connected to PEI.
-    userEeprom->appType() = 0; // Set to BCU2 application. ETS reads this when programming.
+    userEeprom->setAppType(0); // Set to BCU2 application. ETS reads this when programming.
 
     if (ownAddressInAddrTable() && (userEeprom->loadState()[OT_ADDR_TABLE] == LS_LOADING))
     {
@@ -45,7 +45,7 @@ inline void BCU2::begin(const int manufacturer, const int deviceType, const int 
     commObjectTableAddressStatic = readOnlyCommObjectTableAddress;
     if ((commObjectTableAddressStatic != 0) && (userEeprom->commsTabAddr() != commObjectTableAddressStatic))
     {
-        userEeprom->commsTabAddr() = commObjectTableAddressStatic;
+        userEeprom->setCommsTabAddr(commObjectTableAddressStatic);
         userEeprom->modified(true);
     }
 
@@ -69,19 +69,25 @@ inline void BCU2::begin(const int manufacturer, const int deviceType, const int 
 
         // create a 48bit serial/hash from the 128bit Guid
         //useOldSerialStyle = !hashUID(&uniqueID[0], sizeof(uniqueID), &userEeprom->serial()[0], userEeprom->serialSize()); ///\todo delete on release
-        useOldSerialStyle = !createKNXSerial(&uniqueID[0], sizeof(uniqueID), &userEeprom->serial()[0], userEeprom->serialSize());
+        uint8_t knxSerial[KNX_SERIAL_NUMBER_LENGTH];
+        useOldSerialStyle = !createKNXSerial(&uniqueID[0], sizeof(uniqueID), &knxSerial[0], sizeof(knxSerial));
+        if (!useOldSerialStyle)
+        {
+            userEeprom->setSerial(&knxSerial[0], sizeof(knxSerial));
+        }
     }
 
     if (useOldSerialStyle)
     {
         iapReadPartID(&partID);
-        memcpy(userEeprom->serial(), &partID, 4);
-        userEeprom->serial()[4] = HIGH_BYTE(SBLIB_VERSION);
-        userEeprom->serial()[5] = lowByte(SBLIB_VERSION);
+        const uint8_t oldSerial[KNX_SERIAL_NUMBER_LENGTH] = {
+            static_cast<uint8_t>(partID), static_cast<uint8_t>(partID >> 8), static_cast<uint8_t>(partID >> 16),
+            static_cast<uint8_t>(partID >> 24), HIGH_BYTE(SBLIB_VERSION), lowByte(SBLIB_VERSION)};
+        userEeprom->setSerial(&oldSerial[0], sizeof(oldSerial));
     }
 
-    userEeprom->orderInfo()[userEeprom->orderInfoSize() - 2] = HIGH_BYTE(SBLIB_VERSION);
-    userEeprom->orderInfo()[userEeprom->orderInfoSize() - 1] = lowByte(SBLIB_VERSION);
+    userEeprom->setOrderInfo(userEeprom->orderInfoSize() - 2, HIGH_BYTE(SBLIB_VERSION));
+    userEeprom->setOrderInfo(userEeprom->orderInfoSize() - 1, lowByte(SBLIB_VERSION));
 
     BcuDefault::_begin();
     static_cast<ComObjectsBCU2*>(this->comObjects)->printObjectConfigTable();
@@ -175,7 +181,7 @@ void BCU2::setHardwareType(const uint8_t* hardwareType, uint8_t size)
     {
         size = userEeprom->orderSize();
     }
-    memcpy(userEeprom->order(), hardwareType, size);
+    userEeprom->setOrder(hardwareType, size);
 }
 
 bool BCU2::processBroadCastTelegram(const ApciCommand apciCmd, unsigned char* telegram, const TelegramLength telLength)

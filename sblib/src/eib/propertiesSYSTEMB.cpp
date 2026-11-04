@@ -16,6 +16,7 @@
 #include <sblib/eib/propertiesSYSTEMB.h>
 #include <sblib/eib/systemb.h>
 #include <sblib/eib/bus.h>
+#include <sblib/eib/knx_npdu.h>
 
 /**
  * NOT IMPLEMENTED!
@@ -182,10 +183,8 @@ LoadState PropertiesSYSTEMB::handleDataRelativeAllocation(const int objectIdx, c
     // Mode = 0x01 => fill allocated memory
     if (payLoad[4] > 0)
     {
-        uint8_t* physMemAddr = (uint8_t*)(bcu->userEeprom->userEepromData + (virtMemAddr - bcu->userEeprom->startAddr()));
         const uint8_t fillByte = payLoad[5];
-        for (uint32_t i = 0; i < reqMemSize; i++)
-            physMemAddr[i] = fillByte;
+        bcu->userEeprom->fill(virtMemAddr, reqMemSize, fillByte);
     }
 
     return LS_LOADING;
@@ -359,15 +358,18 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
 
     const PropertyDataType type = def->type();
     uint8_t* valuePtr = def->valuePointer(bcu);
+    Memory* memory = def->valueMemory(bcu);
 
-    const uint8_t* data = bcu->bus->telegram + 12;
+    // A_PropertyValue_Write has the TPCI in octet 6 of a standard and in octet 7 of an extended frame
+    const int dataIndex = telegramTpciIndex(bcu->bus->telegram) + 6;
+    const uint8_t* data = bcu->bus->telegram + dataIndex;
     int len;
 
     if (type == PDT_CONTROL)
     {
-        len = bcu->bus->telegramLen - 13;
+        len = bcu->bus->telegramLen - (dataIndex + 1);
         const int state = loadProperty(objectIdx, data, len);
-        bcu->userEeprom->loadState()[objectIdx] = state;
+        bcu->userEeprom->setLoadState(objectIdx, state);
         sendBuffer[12] = state;
         len = 1;
     }
@@ -379,12 +381,30 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
         DB_PROPERTIES(serial.print("propertyValueWriteTelegram: "); printObjectIdx(objectIdx); serial.print(" "); printPropertyID(propertyId); serial.println(););
         if (type >= PDT_CHAR_BLOCK) // byte arrays are stored in telegram order, like in propertyValueReadTelegram()
         {
-            memcpy(valuePtr + start * size, data, len);
+            if (memory)
+            {
+                memory->write(def->valueAddress(bcu) + start * size, data, len);
+            }
+            else
+            {
+                memcpy(valuePtr + start * size, data, len);
+            }
             memcpy(sendBuffer + 12, valuePtr + start * size, len);
         }
         else
         {
-            reverseCopy(valuePtr + start * size, data, len);
+            if (memory)
+            {
+                const uint32_t address = def->valueAddress(bcu) + start * size;
+                for (int i = 0; i < len; ++i)
+                {
+                    memory->setUInt8(address + i, data[len - 1 - i]);
+                }
+            }
+            else
+            {
+                reverseCopy(valuePtr + start * size, data, len);
+            }
             reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
         }
         if (def->isEepromPointer())
