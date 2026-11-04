@@ -1294,6 +1294,22 @@ TEST_CASE("bus load: a repetition after a lost acknowledge is acknowledged but n
     CHECK(r.peer->download.attempts[7] == 2);
 }
 
+TEST_CASE("bus load: the repetition of a telegram still in the buffer is acknowledged, another one is not",
+          "[rp2350][bus][load]")
+{
+    // KNX 3/2/2 2.4.2: a received telegram is acknowledged. The application needs longer than the peer's
+    // repetitions and the first acknowledge is lost: the repetition of the telegram in telegram[] is
+    // acknowledged and not taken again; a different telegram stays without acknowledge (no BUSY, bus.cpp)
+    DownloadResult r;
+    runDownload(r, 2, 300000, {0});
+    REQUIRE(r.peer->download.done);
+    CHECK(r.consumer.received.size() == 1);
+    CHECK(r.peer->download.attempts[0] == 2);
+    CHECK(r.peer->download.acknowledged[0]);
+    CHECK(r.peer->download.attempts[1] == 4);
+    CHECK_FALSE(r.peer->download.acknowledged[1]);
+}
+
 // ------------------------------------------------------------------ GPIO interrupt of the application
 
 namespace

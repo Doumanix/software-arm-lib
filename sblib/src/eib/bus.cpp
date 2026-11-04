@@ -564,11 +564,20 @@ void Bus::handleTelegram(const bool valid)
             // check for space in rx buffer for next telegram, if no space available, send nothing
             if (telegramLen)
             {
-                // KNX Spec. 2.1. 3/2/2 2.4.1 p.38
-                // Device should only send a LL_BUSY if it knows that the telegram can be processed within the next 100ms.
-                // Since we know nothing about the running application we better send nothing
-                sendAck = 0;
-                rx_error |= RX_BUFFER_BUSY;
+                if (already_received)
+                {
+                    // The repetition of the telegram still waiting in the buffer: we have it, so acknowledge it
+                    // (KNX Spec. 3/2/2 2.4.2) and do not take it again
+                    sendAck = SB_BUS_ACK;
+                }
+                else
+                {
+                    // KNX Spec. 2.1. 3/2/2 2.4.1 p.38
+                    // Device should only send a LL_BUSY if it knows that the telegram can be processed within the next 100ms.
+                    // Since we know nothing about the running application we better send nothing
+                    sendAck = 0;
+                    rx_error |= RX_BUFFER_BUSY;
+                }
             }
             else
             {
