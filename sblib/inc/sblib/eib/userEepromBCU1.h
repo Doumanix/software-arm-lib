@@ -50,6 +50,14 @@ public:
     [[nodiscard]] virtual uint8_t* user230bytesStart() const { return &directAccess_8(user230bytesStartOffset); }
     [[nodiscard]] virtual uint8_t& checksum() const { return directAccess_8(checksumOffset); }
 
+    /// Setters for the fields that are written by the load state machine, they write through the Memory API.
+    bool setAppPeiType(const uint8_t value) { return setUInt8(startAddr() + appPeiTypeOffset, value); }
+    bool setManufacturerH(const uint8_t value) { return setUInt8(startAddr() + manufacturerHOffset, value); }
+    bool setManufacturerL(const uint8_t value) { return setUInt8(startAddr() + manufacturerLOffset, value); }
+    bool setDeviceTypeH(const uint8_t value) { return setUInt8(startAddr() + deviceTypeHOffset, value); }
+    bool setDeviceTypeL(const uint8_t value) { return setUInt8(startAddr() + deviceTypeLOffset, value); }
+    bool setVersion(const uint8_t value) { return setUInt8(startAddr() + versionOffset, value); }
+
 protected:
     // BCU1 has no variable EEPROM start or size, so make this constructor protected
     UserEepromBCU1(const uint32_t start, const uint32_t size, const uint32_t flashSize)

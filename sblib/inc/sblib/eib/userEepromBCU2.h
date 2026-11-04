@@ -47,6 +47,20 @@ public:
     [[nodiscard]] virtual uint8_t& padding2() const { return directAccess_8(padding2Offset); }
     [[nodiscard]] virtual uint8_t* orderInfo() const { return &directAccess_8(orderInfoOffset); }
 
+    /// Setters for the fields that are written by the load state machine, they write through the Memory API.
+    /// The 16 bit fields keep the byte order of the getters (low byte first), so the content is unchanged.
+    bool setCommsTabAddr(const uint16_t value) { return setShadow16(commsTabAddrOffset, value); }
+    bool setCommsSeg0Addr(const uint16_t value) { return setShadow16(commsSeg0AddrOffset, value); }
+    bool setCommsSeg1Addr(const uint16_t value) { return setShadow16(commsSeg1AddrOffset, value); }
+    bool setEibObjAddr(const uint16_t value) { return setShadow16(eibObjAddrOffset, value); }
+    bool setEibObjCount(const uint8_t value) { return setUInt8(startAddr() + eibObjCountOffset, value); }
+    bool setAddrTabAddr(const uint16_t value) { return setShadow16(addrTabAddrOffset, value); }
+    bool setAssocTabAddr(const uint16_t value) { return setShadow16(assocTabAddrOffset, value); }
+    bool setLoadState(const uint32_t objectIdx, const uint8_t value)
+    {
+        return setUInt8(startAddr() + loadStateOffset + objectIdx, value);
+    }
+
 protected:
     // BCU2 has no variable EEPROM start or size, so make this constructor protected
     UserEepromBCU2(const uint32_t start, const uint32_t size, const uint32_t flashSize)
@@ -54,6 +68,12 @@ protected:
         UserEepromBCU1(start, size, flashSize) {}
 
 private:
+    bool setShadow16(const uint32_t offset, const uint16_t value)
+    {
+        const uint8_t bytes[2] = {static_cast<uint8_t>(value & 0xff), static_cast<uint8_t>(value >> 8)};
+        return write(startAddr() + offset, bytes, 2);
+    }
+
     ///\todo refactor PropertiesBCU2, so that it doesn't need to access private members of UserEepromBCU2,
     ///      then remove this friend declaration
     friend class PropertiesBCU2;
