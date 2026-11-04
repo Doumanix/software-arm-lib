@@ -10,6 +10,7 @@
 
 #include "sblib/eib/bcu_default.h"
 #include "sblib/eib/knx_lpdu.h"
+#include "sblib/eib/knx_npdu.h"
 #include "sblib/eib/bus.h"
 #include "sblib/bits.h"
 #include <cstring>
@@ -453,8 +454,8 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
         case APCI_ADC_READ_PDU:         ///\todo implement ADC service for bus voltage and PEI,
                             //!> Estimation of the current bus via the AD-converter channel 1 and the AdcRead-service.
                             //!  The value read can be converted to a voltage value by using the following formula: Voltage = ADC_Value * 0,15V
-            index = telegram[7] & 0x3f; // ADC channel
-            count = telegram[8];        // number of samples
+            index = telegram[telegramTpciIndex(telegram) + 1] & 0x3f; // ADC channel
+            count = telegram[telegramTpciIndex(telegram) + 2];        // number of samples
             sendBuffer[5] = 0x60 + 4;   // routing count in high nibble + response length in low nibble
             setApciCommand(sendBuffer, APCI_ADC_RESPONSE_PDU, index);
             sendBuffer[8] = count; // read count
@@ -464,12 +465,13 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
 
         case APCI_MEMORY_READ_PDU:
         case APCI_MEMORY_WRITE_PDU:
-            count = telegram[7] & 0x0f;                   // number of data bytes
-            address = makeWord(telegram[8], telegram[9]); // address of the data block
+            count = telegram[telegramTpciIndex(telegram) + 1] & 0x0f; // number of data bytes
+            address = makeWord(telegram[telegramTpciIndex(telegram) + 2],
+                               telegram[telegramTpciIndex(telegram) + 3]); // address of the data block
 
             if (apciCmd == APCI_MEMORY_WRITE_PDU)
             {
-                if ((telLength - 10 - 1) != count) // telLength includes the checksum
+                if ((telLength - (telegramTpciIndex(telegram) + 4) - 1) != count) // telLength includes the checksum
                 {
                     // number does not match the telegram length, ignore the telegram
                     return (false);
@@ -478,7 +480,7 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
                 ///\todo dirty workaround, should be done in subclasses BCU1, MASKVERSION701, MASKVERSION705...
                 const bool autoResponse =
                         (getMaskVersion() > 0x1F) && (userRam->deviceControl() & DEVCTRL_MEM_AUTO_RESPONSE);
-                if (processApciMemoryWritePDU(address, &telegram[10], count))
+                if (processApciMemoryWritePDU(address, &telegram[telegramTpciIndex(telegram) + 4], count))
                 {
                     if (autoResponse)
                     {
@@ -518,10 +520,11 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
             break;
 
         case APCI_DEVICEDESCRIPTOR_READ_PDU:
-            return (processDeviceDescriptorReadTelegram(sendBuffer, telegram[7] & 0x3f));
+            return (processDeviceDescriptorReadTelegram(sendBuffer, telegram[telegramTpciIndex(telegram) + 1] & 0x3f));
 
         case APCI_MASTER_RESET_PDU:
-            return (processApciMasterResetPDU(sendBuffer, telegram[8], telegram[9]));
+            return (processApciMasterResetPDU(sendBuffer, telegram[telegramTpciIndex(telegram) + 2],
+                                              telegram[telegramTpciIndex(telegram) + 3]));
 
         case APCI_AUTHORIZE_REQUEST_PDU:
             sendBuffer[5] = 0x60 + 2; // routing count in high nibble + response length in low nibble
