@@ -738,7 +738,7 @@ void TLayer4::processDirectTelegram(const ApciCommand apciCmd, unsigned char* te
 }
 
 bool TLayer4::processApci([[maybe_unused]] ApciCommand apciCmd, [[maybe_unused]] unsigned char* telegram,
-     [[maybe_unused]] uint8_t telLength, [[maybe_unused]] uint8_t* sendBuffer)
+     [[maybe_unused]] TelegramLength telLength, [[maybe_unused]] uint8_t* sendBuffer)
 {
     dump2(
         serial.print("TLayer4::processApci");

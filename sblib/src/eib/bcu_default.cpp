@@ -194,7 +194,8 @@ void BcuDefault::setGroupTelRateLimit(const unsigned int limit)
         groupTelWaitMillis = DEFAULT_GROUP_TEL_WAIT_MILLIS;
 }
 
-bool BcuDefault::processGroupAddressTelegram(const ApciCommand apciCmd, const uint16_t groupAddress, unsigned char* telegram, [[maybe_unused]] uint8_t telLength)
+bool BcuDefault::processGroupAddressTelegram(const ApciCommand apciCmd, const uint16_t groupAddress,
+                                             unsigned char* telegram, [[maybe_unused]] TelegramLength telLength)
 {
     DB_COM_OBJ(
         serial.println();
@@ -207,7 +208,8 @@ bool BcuDefault::processGroupAddressTelegram(const ApciCommand apciCmd, const ui
     return (true);
 }
 
-bool BcuDefault::processBroadCastTelegram(const ApciCommand apciCmd, unsigned char* telegram, [[maybe_unused]] uint8_t telLength)
+bool BcuDefault::processBroadCastTelegram(const ApciCommand apciCmd, unsigned char* telegram,
+                                          [[maybe_unused]] TelegramLength telLength)
 {
     if (!programmingMode())
     {
@@ -439,7 +441,8 @@ bool BcuDefault::processApciMemoryOperation(unsigned int addressStart, uint8_t* 
     return (lengthPayLoad == 0);
 }
 
-bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const uint8_t telLength, uint8_t* sendBuffer)
+bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const TelegramLength telLength,
+                             uint8_t* sendBuffer)
 {
     uint8_t count;
     uint16_t address;

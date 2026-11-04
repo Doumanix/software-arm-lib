@@ -112,7 +112,8 @@ BCU2::BCU2(UserRamBCU2* userRam, UserEepromBCU2* userEeprom, ComObjectsBCU2* com
     properties(properties)
 {}
 
-bool BCU2::processApci(const ApciCommand apciCmd, unsigned char* telegram, const uint8_t telLength, uint8_t* sendBuffer)
+bool BCU2::processApci(const ApciCommand apciCmd, unsigned char* telegram, const TelegramLength telLength,
+                       uint8_t* sendBuffer)
 {
     uint8_t count;
     uint16_t address;
@@ -176,7 +177,7 @@ void BCU2::setHardwareType(const uint8_t* hardwareType, uint8_t size)
     memcpy(userEeprom->order(), hardwareType, size);
 }
 
-bool BCU2::processBroadCastTelegram(const ApciCommand apciCmd, unsigned char* telegram, const uint8_t telLength)
+bool BCU2::processBroadCastTelegram(const ApciCommand apciCmd, unsigned char* telegram, const TelegramLength telLength)
 {
     switch (apciCmd)
     {

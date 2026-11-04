@@ -70,20 +70,21 @@ namespace
         unsigned int groupCount = 0;
         unsigned int broadcastCount = 0;
 
-        bool processApci(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength, uint8_t* sendBuffer) override
+        bool processApci(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength,
+                         uint8_t* sendBuffer) override
         {
             apciCount++;
             return BCU1::processApci(apciCmd, telegram, telLength, sendBuffer);
         }
 
         bool processGroupAddressTelegram(ApciCommand apciCmd, uint16_t groupAddress, unsigned char* telegram,
-                                         uint8_t telLength) override
+                                         TelegramLength telLength) override
         {
             groupCount++;
             return BCU1::processGroupAddressTelegram(apciCmd, groupAddress, telegram, telLength);
         }
 
-        bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength) override
+        bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength) override
         {
             broadcastCount++;
             return BCU1::processBroadCastTelegram(apciCmd, telegram, telLength);

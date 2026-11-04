@@ -78,7 +78,7 @@ public:
     /**
      * Process a broadcast telegram.
      */
-    bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength) override;
+    bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength) override;
 
     //  BCU 2, mask version 2.0
     unsigned short getMaskVersion() const override { return 0x20; }
@@ -142,7 +142,8 @@ protected:
      * @param sendBuffer    Pointer to the buffer for a potential response telegram
      * @return True if a response telegram was prepared, otherwise false
      */
-    bool processApci(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength, uint8_t* sendBuffer) override;
+    bool processApci(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength,
+                     uint8_t* sendBuffer) override;
 
     void sendApciIndividualAddressSerialNumberReadResponse();
 

@@ -119,7 +119,8 @@ protected:
      * @param sendBuffer    Pointer to the buffer for a potential response telegram
      * @return True if a response telegram was prepared, otherwise false
      */
-    bool processApci(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength, uint8_t* sendBuffer) override;
+    bool processApci(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength,
+                     uint8_t* sendBuffer) override;
 
     /**
      * Handles individual address broadcast telegrams.

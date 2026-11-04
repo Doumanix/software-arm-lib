@@ -127,12 +127,13 @@ protected:
     /**
      * Process a group address (T_Data_Group) telegram.
      */
-    virtual bool processGroupAddressTelegram(ApciCommand apciCmd, uint16_t groupAddress, unsigned char* telegram, uint8_t telLength) = 0;
+    virtual bool processGroupAddressTelegram(ApciCommand apciCmd, uint16_t groupAddress, unsigned char* telegram,
+                                             TelegramLength telLength) = 0;
 
     /**
      * Process a broadcast telegram.
      */
-    virtual bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength) = 0;
+    virtual bool processBroadCastTelegram(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength) = 0;
 
     /**
      * Processes a APCI telegram
@@ -143,7 +144,8 @@ protected:
      * @param sendBuffer    Pointer to the buffer for a potential response telegram
      * @return Always false
      */
-    virtual bool processApci(ApciCommand apciCmd, unsigned char* telegram, uint8_t telLength, uint8_t* sendBuffer);
+    virtual bool processApci(ApciCommand apciCmd, unsigned char* telegram, TelegramLength telLength,
+                             uint8_t* sendBuffer);
 
     /**
      * Disconnect from connected client.
