@@ -352,10 +352,25 @@ int PropertiesSYSTEMB::loadProperty(const int objectIdx, const uint8_t* data, in
     if (newLoadState == LS_UNLOADED)
     {
         // clear table reference address on unload
-        const PropertyDef* def = propertyDef(objectIdx, PID_TABLE_REFERENCE);
-        uint8_t* valuePtr = def->valuePointer(bcu);
-        valuePtr[1] = 0;
-        valuePtr[0] = 0;
+        UserEepromSYSTEMB* userEeprom = static_cast<UserEepromSYSTEMB*>(bcu->userEeprom);
+        switch (objectIdx - 1)
+        {
+            case 0:
+                userEeprom->setAddrTabAddr(0);
+                break;
+            case 1:
+                userEeprom->setAssocTabAddr(0);
+                break;
+            case 2:
+                userEeprom->setCommsTabAddr(0);
+                break;
+            case 3:
+                userEeprom->setEibObjAddr(0);
+                break;
+            case 4:
+                userEeprom->setCommsSeg0Addr(0);
+                break;
+        }
         return newLoadState;
     }
 

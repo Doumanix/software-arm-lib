@@ -697,6 +697,20 @@ static Telegram apciSystemBElementCountTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
+// Unload clears the table reference of the object
+#define TEL_UNLOAD_CLEARS_REFERENCE(seq, obj, a0, a1)     TEL_VALUE_READ(seq, obj, 0x07), TEL_VALUE_RESPONSE_4(seq, obj, 0x07, 0x00, 0x00, a0, a1),     TEL_LOAD_EVENT(seq + 1, obj, 0x04, 0x00),     TEL_VALUE_READ(seq + 2, obj, 0x07), TEL_VALUE_RESPONSE_4(seq + 2, obj, 0x07, 0x00, 0x00, 0x00, 0x00)
+
+static Telegram apciSystemBUnloadTelegrams[] =
+{
+    {TEL_RX, 7, 0, 0, setSystemBTableAddresses, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}},
+    TEL_UNLOAD_CLEARS_REFERENCE(0, 1, 0x34, 0x56),
+    TEL_UNLOAD_CLEARS_REFERENCE(3, 2, 0x34, 0x58),
+    TEL_UNLOAD_CLEARS_REFERENCE(6, 3, 0x35, 0x00),
+    TEL_UNLOAD_CLEARS_REFERENCE(9, 4, 0x36, 0x00),
+    TEL_UNLOAD_CLEARS_REFERENCE(12, 5, 0x37, 0x00),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
 static Test_Case testCaseApciSystemBObjectType =
 {
     "APCI_PROPERTY SYSTEM B object types",
@@ -734,6 +748,19 @@ static Test_Case testCaseApciSystemBElementCount =
     NULL,
     NULL,
     apciSystemBElementCountTelegrams
+};
+
+static Test_Case testCaseApciSystemBUnload =
+{
+    "APCI_PROPERTY SYSTEM B unload",
+    MANUFACTURER, DEVICE, VERSION,
+    0,    //powerOnDelay
+    NULL, // eePromSetup
+    tc_setup,
+    NULL,
+    NULL,
+    NULL,
+    apciSystemBUnloadTelegrams
 };
 
 static Test_Case testCaseApciSystemBTableReference =
@@ -853,6 +880,7 @@ TEST_CASE("APCI processing", "[protocol][APCI]")
         executeTest(bcuTypeToTest, &testCaseApciSystemBApplication);
         executeTest(bcuTypeToTest, &testCaseApciSystemBLoadState);
         executeTest(bcuTypeToTest, &testCaseApciSystemBElementCount);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBUnload);
     }
 }
 
