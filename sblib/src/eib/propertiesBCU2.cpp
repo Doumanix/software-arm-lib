@@ -491,9 +491,9 @@ bool PropertiesBCU2::propertyValueReadTelegram(const int objectIdx, const Proper
     if (start == 0)
     {
         // element 0 holds the current number of elements
-        sendBuffer[12] = HIGH_BYTE(numElements);
-        sendBuffer[13] = lowByte(numElements);
-        sendBuffer[5] += 2;
+        sendBuffer[telegramTpciIndex(sendBuffer) + 6] = HIGH_BYTE(numElements);
+        sendBuffer[telegramTpciIndex(sendBuffer) + 7] = lowByte(numElements);
+        telegramAddApduLength(sendBuffer, 2);
         return true;
     }
 
@@ -510,14 +510,14 @@ bool PropertiesBCU2::propertyValueReadTelegram(const int objectIdx, const Proper
 
     if (type < PDT_CHAR_BLOCK)
     {
-        reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
+        reverseCopy(sendBuffer + (telegramTpciIndex(sendBuffer) + 6), valuePtr + start * size, len);
     }
     else
     {
-        memcpy(sendBuffer + 12, valuePtr + start * size, len);
+        memcpy(sendBuffer + (telegramTpciIndex(sendBuffer) + 6), valuePtr + start * size, len);
     }
 
-    sendBuffer[5] += len;
+    telegramAddApduLength(sendBuffer, len);
 
     return true;
 }
@@ -547,7 +547,7 @@ bool PropertiesBCU2::propertyValueWriteTelegram(const int objectIdx, const Prope
         len = bcu->bus->telegramLen - (dataIndex + 1);
         const int state = loadProperty(objectIdx, data, len);
         bcu->userEeprom->setLoadState(objectIdx, state);
-        sendBuffer[12] = state;
+        sendBuffer[telegramTpciIndex(sendBuffer) + 6] = state;
         len = 1;
     }
     else
@@ -585,12 +585,12 @@ bool PropertiesBCU2::propertyValueWriteTelegram(const int objectIdx, const Prope
         {
             reverseCopy(valuePtr + start * size, data, len);
         }
-        reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
+        reverseCopy(sendBuffer + (telegramTpciIndex(sendBuffer) + 6), valuePtr + start * size, len);
         if (def->isEepromPointer())
             bcu->userEeprom->modified(true);
     }
 
-    sendBuffer[5] += len;
+    telegramAddApduLength(sendBuffer, len);
     return true;
 }
 
@@ -603,15 +603,15 @@ bool PropertiesBCU2::propertyDescReadTelegram(const int objectIdx, const Propert
     else
         def = &propertiesTab()[objectIdx][index];
 
-    sendBuffer[10] = index;
+    sendBuffer[telegramTpciIndex(sendBuffer) + 4] = index;
 
     if (!def || !def->id)
     {
-        sendBuffer[9] = propertyId;
-        sendBuffer[11] = 0;
-        sendBuffer[12] = 0;
-        sendBuffer[13] = 0;
-        sendBuffer[14] = 0;
+        sendBuffer[telegramTpciIndex(sendBuffer) + 3] = propertyId;
+        sendBuffer[telegramTpciIndex(sendBuffer) + 5] = 0;
+        sendBuffer[telegramTpciIndex(sendBuffer) + 6] = 0;
+        sendBuffer[telegramTpciIndex(sendBuffer) + 7] = 0;
+        sendBuffer[telegramTpciIndex(sendBuffer) + 8] = 0;
         return false; // not found
     }
 
@@ -621,11 +621,11 @@ bool PropertiesBCU2::propertyDescReadTelegram(const int objectIdx, const Propert
     else
         numElems = 1;
 
-    sendBuffer[9] = def->id;
-    sendBuffer[11] = def->control & (PC_TYPE_MASK | PC_WRITABLE);
-    sendBuffer[12] = (numElems >> 8) & 15;
-    sendBuffer[13] = numElems;
-    sendBuffer[14] = def->control & PC_WRITABLE ? 0xf1 : 0x50; // wild guess from bus traces
+    sendBuffer[telegramTpciIndex(sendBuffer) + 3] = def->id;
+    sendBuffer[telegramTpciIndex(sendBuffer) + 5] = def->control & (PC_TYPE_MASK | PC_WRITABLE);
+    sendBuffer[telegramTpciIndex(sendBuffer) + 6] = (numElems >> 8) & 15;
+    sendBuffer[telegramTpciIndex(sendBuffer) + 7] = numElems;
+    sendBuffer[telegramTpciIndex(sendBuffer) + 8] = def->control & PC_WRITABLE ? 0xf1 : 0x50; // wild guess from bus traces
 
     return true;
 }

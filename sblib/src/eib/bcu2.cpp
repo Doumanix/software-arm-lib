@@ -138,30 +138,30 @@ bool BCU2::processApci(const ApciCommand apciCmd, unsigned char* telegram, const
             address = ((telegram[telegramTpciIndex(telegram) + 4] & 0x0f) << 4);
             address = (uint16_t)(address | (telegram[telegramTpciIndex(telegram) + 5]));
 
-            sendBuffer[5] = 0x60 + 5; // routing count in high nibble + response length in low nibble
+            telegramSetApduLength(sendBuffer, 5);
             setApciCommand(sendBuffer, APCI_PROPERTY_VALUE_RESPONSE_PDU, 0);
-            sendBuffer[8] = index;
-            sendBuffer[9] = id;
-            sendBuffer[10] = telegram[telegramTpciIndex(telegram) + 4];
-            sendBuffer[11] = telegram[telegramTpciIndex(telegram) + 5];
+            sendBuffer[telegramTpciIndex(sendBuffer) + 2] = index;
+            sendBuffer[telegramTpciIndex(sendBuffer) + 3] = id;
+            sendBuffer[telegramTpciIndex(sendBuffer) + 4] = telegram[telegramTpciIndex(telegram) + 4];
+            sendBuffer[telegramTpciIndex(sendBuffer) + 5] = telegram[telegramTpciIndex(telegram) + 5];
 
             if (apciCmd == APCI_PROPERTY_VALUE_READ_PDU)
                 found = properties->propertyValueReadTelegram(index, (PropertyID)id, count, address, sendBuffer);
             else
                 found = properties->propertyValueWriteTelegram(index, (PropertyID)id, count, address, sendBuffer);
             if (!found)
-                sendBuffer[10] &= 0x0f; // number of elements 0, start index unchanged
+                sendBuffer[telegramTpciIndex(sendBuffer) + 4] &= 0x0f; // number of elements 0, start index unchanged
             return (true);
 
         case APCI_PROPERTY_DESCRIPTION_READ_PDU:
             index = telegram[telegramTpciIndex(telegram) + 2];
             id = telegram[telegramTpciIndex(telegram) + 3];
             address = telegram[telegramTpciIndex(telegram) + 4];
-            sendBuffer[5] = 0x60 + 8; // routing count in high nibble + response length in low nibble
+            telegramSetApduLength(sendBuffer, 8);
             setApciCommand(sendBuffer, APCI_PROPERTY_DESCRIPTION_RESPONSE_PDU, 0);
-            sendBuffer[8] = index;
-            sendBuffer[9] = id;
-            sendBuffer[10] = (uint8_t)address;
+            sendBuffer[telegramTpciIndex(sendBuffer) + 2] = index;
+            sendBuffer[telegramTpciIndex(sendBuffer) + 3] = id;
+            sendBuffer[telegramTpciIndex(sendBuffer) + 4] = (uint8_t)address;
             properties->propertyDescReadTelegram(index, (PropertyID)id, address, sendBuffer);
             return (true);
 
@@ -229,21 +229,21 @@ void BCU2::sendApciIndividualAddressSerialNumberReadResponse()
     initLpdu(sendBuffer, PRIORITY_SYSTEM, false, FRAME_STANDARD);
     // 1+2 contain the sender address, which is set by bus.sendTelegram()
     setDestinationAddress(sendBuffer, 0x0000); // Zero target address, it's a broadcast
-    sendBuffer[5] = 0xe0 + 11;                 // address type & routing count in high nibble + response length (11) in low nibble
+    telegramSetGroupApduLength(sendBuffer, 11);
     setApciCommand(sendBuffer, APCI_INDIVIDUALADDRESS_SERIALNUMBER_RESPONSE_PDU, 0);
-    // sendBuffer[8-13] contains serial number
+    // octets 2-7 after the TPCI contain the serial number
     for (uint8_t i = 0; i < userEeprom->serialSize(); i++)
     {
-        sendBuffer[8 + i] = userEeprom->serial()[i];
+        sendBuffer[telegramTpciIndex(sendBuffer) + 2 + i] = userEeprom->serial()[i];
     }
 
-    // sendBuffer[14-15] contains domain address
-    sendBuffer[14] = 0x00;
-    sendBuffer[15] = 0x00;
+    // octets 8-9 after the TPCI contain the domain address
+    sendBuffer[telegramTpciIndex(sendBuffer) + 8] = 0x00;
+    sendBuffer[telegramTpciIndex(sendBuffer) + 9] = 0x00;
 
-    // sendBuffer[16-17] reserved
-    sendBuffer[16] = 0x00;
-    sendBuffer[17] = 0x00;
+    // octets 10-11 after the TPCI are reserved
+    sendBuffer[telegramTpciIndex(sendBuffer) + 10] = 0x00;
+    sendBuffer[telegramTpciIndex(sendBuffer) + 11] = 0x00;
 
     sendPreparedTelegram();
 }

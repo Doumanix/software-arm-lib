@@ -88,6 +88,29 @@ enum Hop_count_type {};
 #   define telegramIsGroupAddress(tel) ((tel)[5] & 0x80)
 #endif
 
+/**
+ * Set the APDU length (number of octets after the TPCI octet) of a telegram to send, hop count 6.
+ * telegramSetApduLength() for an individual destination address, telegramSetGroupApduLength() for a group
+ * or the broadcast address, telegramAddApduLength() adds octets and keeps the address type. With
+ * SBLIB_MAX_APDU_LENGTH > 15 the frame format follows the length: a standard frame up to 15 octets,
+ * an extended frame above (KNX 3/2/2 2.2.5.1), see @ref lpduSetFrameApduLength(). Octets of the APDU written
+ * before move with the TPCI octet, so the APDU is addressed relative to @ref telegramTpciIndex() of the
+ * send buffer. With the default 15 only standard frames are sent and the expressions are unchanged, so the
+ * generated code stays the same.
+ *
+ * @param tel - the telegram to send, with its control field and destination address
+ * @param n - the APDU length or the number of octets to add
+ */
+#if SBLIB_MAX_APDU_LENGTH > 15
+#   define telegramSetApduLength(tel, n) lpduSetFrameApduLength((tel), 0x60, static_cast<uint8_t>(n))
+#   define telegramSetGroupApduLength(tel, n) lpduSetFrameApduLength((tel), 0xe0, static_cast<uint8_t>(n))
+#   define telegramAddApduLength(tel, n) lpduAddFrameApduLength((tel), static_cast<uint8_t>(n))
+#else
+#   define telegramSetApduLength(tel, n) (tel)[5] = 0x60 + (n)
+#   define telegramSetGroupApduLength(tel, n) (tel)[5] = 0xe0 | (n)
+#   define telegramAddApduLength(tel, n) (tel)[5] += (n)
+#endif
+
 
 #endif /* SBLIB_KNX_NPDU_H_ */
 /** @}*/

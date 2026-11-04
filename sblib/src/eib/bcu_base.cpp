@@ -197,7 +197,7 @@ void BcuBase::sendApciIndividualAddressReadResponse()
     initLpdu(sendBuffer, PRIORITY_SYSTEM, false, FRAME_STANDARD);
     // 1+2 contain the sender address, which is set by bus.sendTelegram()
     setDestinationAddress(sendBuffer, 0x0000); // Zero target address, it's a broadcast
-    sendBuffer[5] = 0xe0 + 1;                  // address type & routing count in high nibble + response length in low nibble
+    telegramSetGroupApduLength(sendBuffer, 1);
     setApciCommand(sendBuffer, APCI_INDIVIDUAL_ADDRESS_RESPONSE_PDU, 0);
     sendPreparedTelegram();
 }

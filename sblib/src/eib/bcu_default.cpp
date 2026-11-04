@@ -466,11 +466,11 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
                             //!  The value read can be converted to a voltage value by using the following formula: Voltage = ADC_Value * 0,15V
             index = telegram[telegramTpciIndex(telegram) + 1] & 0x3f; // ADC channel
             count = telegram[telegramTpciIndex(telegram) + 2];        // number of samples
-            sendBuffer[5] = 0x60 + 4;   // routing count in high nibble + response length in low nibble
+            telegramSetApduLength(sendBuffer, 4);
             setApciCommand(sendBuffer, APCI_ADC_RESPONSE_PDU, index);
-            sendBuffer[8] = count; // read count
-            sendBuffer[9] = 0;     // ADC value high byte
-            sendBuffer[10] = 0;    // ADC value low byte
+            sendBuffer[telegramTpciIndex(sendBuffer) + 2] = count; // read count
+            sendBuffer[telegramTpciIndex(sendBuffer) + 3] = 0;     // ADC value high byte
+            sendBuffer[telegramTpciIndex(sendBuffer) + 4] = 0;     // ADC value low byte
             return (true);
 
         case APCI_MEMORY_READ_PDU:
@@ -514,17 +514,17 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
                     count = 0;
                 }
 
-                if (!processApciMemoryReadPDU(address, &sendBuffer[10], count))
+                if (!processApciMemoryReadPDU(address, &sendBuffer[telegramTpciIndex(sendBuffer) + 4], count))
                 {
                     // address space unreachable, need to respond with count 0
                     count = 0;
                 }
 
                 // send a APCI_MEMORY_RESPONSE_PDU response
-                sendBuffer[5] = 0x60 + count + 3; // routing count in high nibble + response length in low nibble
+                telegramSetApduLength(sendBuffer, count + 3);
                 setApciCommand(sendBuffer, APCI_MEMORY_RESPONSE_PDU, count);
-                sendBuffer[8] = HIGH_BYTE(address);
-                sendBuffer[9] = lowByte(address);
+                sendBuffer[telegramTpciIndex(sendBuffer) + 2] = HIGH_BYTE(address);
+                sendBuffer[telegramTpciIndex(sendBuffer) + 3] = lowByte(address);
                 return (true);
             }
             break;
@@ -537,9 +537,9 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
                                               telegram[telegramTpciIndex(telegram) + 3]));
 
         case APCI_AUTHORIZE_REQUEST_PDU:
-            sendBuffer[5] = 0x60 + 2; // routing count in high nibble + response length in low nibble
+            telegramSetApduLength(sendBuffer, 2);
             setApciCommand(sendBuffer, APCI_AUTHORIZE_RESPONSE_PDU, 0);
-            sendBuffer[8] = 0x00;
+            sendBuffer[telegramTpciIndex(sendBuffer) + 2] = 0x00;
             return (true);
 
         default:
@@ -555,10 +555,10 @@ bool BcuDefault::processDeviceDescriptorReadTelegram(uint8_t* sendBuffer, const 
         return (false); // unknown device descriptor
     }
 
-    sendBuffer[5] = 0x60 + 3; // routing count in high nibble + response length in low nibble
+    telegramSetApduLength(sendBuffer, 3);
     setApciCommand(sendBuffer, APCI_DEVICEDESCRIPTOR_RESPONSE_PDU, 0);
-    sendBuffer[8] = HIGH_BYTE(getMaskVersion());
-    sendBuffer[9] = lowByte(getMaskVersion());
+    sendBuffer[telegramTpciIndex(sendBuffer) + 2] = HIGH_BYTE(getMaskVersion());
+    sendBuffer[telegramTpciIndex(sendBuffer) + 3] = lowByte(getMaskVersion());
     return (true);
 }
 
@@ -591,11 +591,12 @@ bool BcuDefault::processApciMasterResetPDU(uint8_t* sendBuffer, const uint8_t er
     const auto seconds = (errorCode == T_RESTART_NO_ERROR) ? 1 : 0; // 1 second or error
 
     // create the APCI_MASTER_RESET_RESPONSE_PDU
-    sendBuffer[5] = 0x60 + 4; // routing count in high nibble + response length in low nibble
+    telegramSetApduLength(sendBuffer, 4);
     setApciCommand(sendBuffer, APCI_MASTER_RESET_RESPONSE_PDU, 0);
-    sendBuffer[8] = errorCode;
-    sendBuffer[9] = 0; // restart process time 2 byte unsigned integer value expressed in seconds, DPT_TimePeriodSec / DPT7.005
-    sendBuffer[10] = seconds;
+    sendBuffer[telegramTpciIndex(sendBuffer) + 2] = errorCode;
+    // restart process time 2 byte unsigned integer value expressed in seconds, DPT_TimePeriodSec / DPT7.005
+    sendBuffer[telegramTpciIndex(sendBuffer) + 3] = 0;
+    sendBuffer[telegramTpciIndex(sendBuffer) + 4] = seconds;
 
     if (restartType != RestartType::None)
     {

@@ -330,16 +330,16 @@ bool PropertiesSYSTEMB::propertyValueReadTelegram(const int objectIdx, const Pro
         if ((start != 0) || (count != 1))
             return false; // only one element
 
-        sendBuffer[12] = 0;
-        sendBuffer[13] = 0;
-        reverseCopy(sendBuffer + 14, valuePtr, 2);
+        sendBuffer[telegramTpciIndex(sendBuffer) + 6] = 0;
+        sendBuffer[telegramTpciIndex(sendBuffer) + 7] = 0;
+        reverseCopy(sendBuffer + (telegramTpciIndex(sendBuffer) + 8), valuePtr, 2);
     }
     else if (type < PDT_CHAR_BLOCK)
-        reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
+        reverseCopy(sendBuffer + (telegramTpciIndex(sendBuffer) + 6), valuePtr + start * size, len);
     else
-        memcpy(sendBuffer + 12, valuePtr + start * size, len);
+        memcpy(sendBuffer + (telegramTpciIndex(sendBuffer) + 6), valuePtr + start * size, len);
 
-    sendBuffer[5] += len;
+    telegramAddApduLength(sendBuffer, len);
 
     return true;
 }
@@ -370,7 +370,7 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
         len = bcu->bus->telegramLen - (dataIndex + 1);
         const int state = loadProperty(objectIdx, data, len);
         bcu->userEeprom->setLoadState(objectIdx, state);
-        sendBuffer[12] = state;
+        sendBuffer[telegramTpciIndex(sendBuffer) + 6] = state;
         len = 1;
     }
     else
@@ -389,7 +389,7 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
             {
                 memcpy(valuePtr + start * size, data, len);
             }
-            memcpy(sendBuffer + 12, valuePtr + start * size, len);
+            memcpy(sendBuffer + (telegramTpciIndex(sendBuffer) + 6), valuePtr + start * size, len);
         }
         else
         {
@@ -405,12 +405,12 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
             {
                 reverseCopy(valuePtr + start * size, data, len);
             }
-            reverseCopy(sendBuffer + 12, valuePtr + start * size, len);
+            reverseCopy(sendBuffer + (telegramTpciIndex(sendBuffer) + 6), valuePtr + start * size, len);
         }
         if (def->isEepromPointer())
             bcu->userEeprom->modified(true);
     }
 
-    sendBuffer[5] += len;
+    telegramAddApduLength(sendBuffer, len);
     return true;
 }

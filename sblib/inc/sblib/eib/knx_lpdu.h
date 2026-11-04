@@ -441,6 +441,59 @@ constexpr uint8_t lpduInitExtendedFrame(uint8_t* telegram, const KNXPriority new
 }
 
 /**
+ * @brief Set the APDU length of a frame to send and choose the frame format by it.
+ * @details A standard frame for an APDU length up to 15 octets, an L_Data_Extended frame for a longer APDU
+ *          (KNX 3/2/2 2.2.5.1). If the format changes, the TPCI octet and the APDU octets move with it, so the
+ *          APDU can be written before. The priority, the repeat flag and the destination address are kept.
+ * @param telegram       Pointer to the telegram buffer, the control field and the destination address must be set
+ * @param addressTypeHop Address type (bit 7) and hop count (bits 4..6) as in octet 5 of a standard frame
+ * @param apduLength     Number of octets after the TPCI octet, 0..254
+ */
+constexpr void lpduSetFrameApduLength(uint8_t* telegram, const uint8_t addressTypeHop, const uint8_t apduLength)
+{
+    const uint16_t destination = lpduDestinationAddress(telegram);
+    const bool extended = apduLength > 15;
+    if (extended && !isExtendedFrame(telegram))
+    {
+        for (uint16_t i = 7 + apduLength; i > 6; --i)
+        {
+            telegram[i] = telegram[i - 1];
+        }
+        telegram[0] &= 0x7f;
+    }
+    else if (!extended && isExtendedFrame(telegram))
+    {
+        for (uint16_t i = 6; i <= 6 + apduLength; ++i)
+        {
+            telegram[i] = telegram[i + 1];
+        }
+        telegram[0] |= 0x80;
+    }
+
+    if (extended)
+    {
+        telegram[1] = addressTypeHop & 0xf0;
+        telegram[6] = apduLength;
+    }
+    else
+    {
+        telegram[5] = static_cast<uint8_t>((addressTypeHop & 0xf0) | apduLength);
+    }
+    lpduSetDestinationAddress(telegram, destination);
+}
+
+/**
+ * @brief Add octets to the APDU length of a frame to send, see @ref lpduSetFrameApduLength().
+ * @param telegram Pointer to the telegram buffer
+ * @param octets   Number of octets to add, the sum must not exceed 254
+ */
+constexpr void lpduAddFrameApduLength(uint8_t* telegram, const uint8_t octets)
+{
+    lpduSetFrameApduLength(telegram, telegram[lpduAddressTypeIndex(telegram)],
+                           static_cast<uint8_t>(lpduApduLength(telegram) + octets));
+}
+
+/**
  * Return the area number of a given physical KNX address
  * @param address Individual KNX address
  * @return The area number of the individual address
