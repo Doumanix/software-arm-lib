@@ -40,11 +40,9 @@ namespace bustest
             ++finished;
             lastSuccessful = successful;
         }
-        [[nodiscard]] uint8_t getLayerStatus() const override
-        {
-            return BCU_STATUS_LINK_LAYER | BCU_STATUS_TRANSPORT_LAYER;
-        }
+        [[nodiscard]] uint8_t getLayerStatus() const override { return layerStatus; }
 
+        uint8_t layerStatus = BCU_STATUS_LINK_LAYER | BCU_STATUS_TRANSPORT_LAYER;
         int finished = 0;
         bool lastSuccessful = false;
     };

@@ -1310,6 +1310,52 @@ TEST_CASE("bus load: the repetition of a telegram still in the buffer is acknowl
     CHECK_FALSE(r.peer->download.acknowledged[1]);
 }
 
+TEST_CASE("bus acknowledge: with the transport layer off every frame is taken, only addressed ones are acknowledged",
+          "[rp2350][bus][ack]")
+{
+    // KNX 03_02_02 2.4.2: acknowledge after addressing check; a frame to another individual address gets none.
+    // The application (ft12, knx-if) still gets every frame when the TL is off (bus.cpp)
+    constexpr uint16_t ForeignAddress = 0x1201;
+    const auto toIndividual = [](const uint16_t address)
+    {
+        return withChecksum({0xB0, 0x11, 0x02, static_cast<uint8_t>(address >> 8), static_cast<uint8_t>(address & 0xff),
+                             0x60, 0x80});
+    };
+    struct Case
+    {
+        const char* name;
+        std::vector<uint8_t> frame;
+        bool tlOff;
+        bool taken;
+        bool acknowledged;
+    };
+    const std::vector<Case> cases = {
+            {"foreign individual address, TL off", toIndividual(ForeignAddress), true, true, false},
+            {"own individual address, TL off", toIndividual(OwnAddress), true, true, true},
+            {"known group address, TL off", remoteGroupWrite(1), true, true, true},
+            {"foreign individual address, TL on", toIndividual(ForeignAddress), false, false, false},
+    };
+    for (const auto& c: cases)
+    {
+        DYNAMIC_SECTION(c.name)
+        {
+            startBus();
+            if (c.tlOff)
+            {
+                callback.layerStatus = BCU_STATUS_LINK_LAYER;
+            }
+            Peer peer;
+            peer.attach();
+            Consumer consumer;
+            peer.send(sim::now() + 1000, c.frame);
+            runMain(consumer, 60000);
+            CHECK(consumer.received.size() == (c.taken ? 1u : 0u));
+            REQUIRE(peer.sent.size() == 1);
+            CHECK((peer.acknowledgeOf(peer.sent[0]) != nullptr) == c.acknowledged);
+        }
+    }
+}
+
 // ------------------------------------------------------------------ GPIO interrupt of the application
 
 namespace

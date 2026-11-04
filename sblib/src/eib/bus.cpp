@@ -538,6 +538,9 @@ void Bus::handleTelegram(const bool valid)
             processTel = true;
         }
 
+        // only a telegram addressed to us is acknowledged (KNX 03_02_02 2.4.2), also with disabled TL
+        const bool ackTel = processTel;
+
         // with disabled TL we also process the telegram, so the application (e.g. ft12, knx-if) can handle it completely by itself
         processTel |= !(callBack->getLayerStatus() & BCU_STATUS_TRANSPORT_LAYER);
 
@@ -595,6 +598,8 @@ void Bus::handleTelegram(const bool valid)
             auto suppressAck = !(callBack->getLayerStatus() & BCU_STATUS_LINK_LAYER);
             // LL_ACK only allowed for L_Data frames
             suppressAck |= rx_telegram[0] & SB_TEL_DATA_FRAME_FLAG;
+            // no LL_ACK for a telegram that is only taken because the TL is disabled
+            suppressAck |= !ackTel;
             if (suppressAck)
             {
                 sendAck = 0;
