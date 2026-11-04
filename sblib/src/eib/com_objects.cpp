@@ -351,7 +351,7 @@ void ComObjects::sendGroupReadTelegram(const int objno, const int addr)
     // check of spec 3.7.4. : no additional search for associations to Grp Addr for local read and possible response
     initLpdu(sendBuffer, PRIORITY_LOW, false, FRAME_STANDARD);
     setDestinationAddress(sendBuffer, addr);
-    sendBuffer[5] = 0xe1; // routing count + length
+    telegramSetGroupApduLength(sendBuffer, 1);
     setApciCommand(sendBuffer, APCI_GROUP_VALUE_READ_PDU, 0);
     bcu->sendPreparedTelegram();
     transmitting_object_no = objno; //save transmitting object for status check
@@ -368,12 +368,12 @@ void ComObjects::sendGroupWriteTelegram(const int objno, const int addr, const b
     ///\todo Set routing count and priority according to the parameters set from ETS in the EEPROM, add ID/objno for result association from bus-layer
     initLpdu(sendBuffer, PRIORITY_LOW, false, FRAME_STANDARD);
     setDestinationAddress(sendBuffer, addr);
-    sendBuffer[5] = 0xe0 | ((objSize + 1) & 0x0f);
+    telegramSetGroupApduLength(sendBuffer, (objSize + 1) & 0x0f);
 
     isResponse ? cmd = APCI_GROUP_VALUE_RESPONSE_PDU : cmd = APCI_GROUP_VALUE_WRITE_PDU;
 
     if (objSize)
-        reverseCopy(sendBuffer + 8, valuePtr, objSize);
+        reverseCopy(sendBuffer + (telegramTpciIndex(sendBuffer) + 2), valuePtr, objSize);
     else
         addData = *valuePtr;
 

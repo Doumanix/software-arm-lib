@@ -557,9 +557,11 @@ static Telegram apciMemoryReadNumber##NUMBER##Telegrams[] = \
     {END, 0, 0, 0, nullptr, {0}} \
 }
 
+#if SBLIB_MAX_APDU_LENGTH == 15
 MEMORY_READ_TOO_MANY(0x0D);
 MEMORY_READ_TOO_MANY(0x0E);
 MEMORY_READ_TOO_MANY(0x0F);
+#endif
 
 static Telegram apciMemoryWriteTooShortTelegrams[] =
 {
@@ -618,9 +620,11 @@ static Telegram apciMemoryWriteVerifyModeInactiveFailedTelegrams[] =
 #define MEMORY_TEST_CASE(NAME, SETUP, TELEGRAMS) \
 static Test_Case NAME = {#NAME, MANUFACTURER, DEVICE, VERSION, 0, NULL, SETUP, NULL, NULL, NULL, TELEGRAMS}
 
+#if SBLIB_MAX_APDU_LENGTH == 15
 MEMORY_TEST_CASE(testCaseMemoryReadNumber13, tc_setup, apciMemoryReadNumber0x0DTelegrams);
 MEMORY_TEST_CASE(testCaseMemoryReadNumber14, tc_setup, apciMemoryReadNumber0x0ETelegrams);
 MEMORY_TEST_CASE(testCaseMemoryReadNumber15, tc_setup, apciMemoryReadNumber0x0FTelegrams);
+#endif
 MEMORY_TEST_CASE(testCaseMemoryWriteTooShort, tc_setup, apciMemoryWriteTooShortTelegrams);
 MEMORY_TEST_CASE(testCaseMemoryWriteTooLong, tc_setup, apciMemoryWriteTooLongTelegrams);
 MEMORY_TEST_CASE(testCaseMemoryWriteVerifyModeOk, tc_setupVerifyMode, apciMemoryWriteVerifyModeOkTelegrams);
@@ -775,9 +779,12 @@ TEST_CASE("APCI memory services handle invalid parameters", "[protocol][APCI][ap
         bcuTypeToTest = BCU_0705;
     }
 
+#if SBLIB_MAX_APDU_LENGTH == 15
+    // with longer APDUs these numbers are valid, see test_prot_memory_lf.cpp
     executeTest(bcuTypeToTest, &testCaseMemoryReadNumber13);
     executeTest(bcuTypeToTest, &testCaseMemoryReadNumber14);
     executeTest(bcuTypeToTest, &testCaseMemoryReadNumber15);
+#endif
     executeTest(bcuTypeToTest, &testCaseMemoryWriteTooShort);
     executeTest(bcuTypeToTest, &testCaseMemoryWriteTooLong);
     if (bcuTypeToTest != BCU_1)

@@ -16,6 +16,7 @@
 #include <sblib/libconfig.h>
 
 #include <sblib/eib/property_types.h>
+#include <sblib/eib/bcu_const.h>
 #ifdef DUMP_PROPERTIES
 #   include <sblib/serial.h>
 #endif
@@ -37,6 +38,13 @@ constexpr uint8_t PID_LOAD_STATE_CONTROL_LENGTH = 10;
 #define DMP_LOADSTATE_MACHINE_WRITE_RCO_MEM_PAYLOAD_OFFSET 3    //!> offset for RCo_Mem mode, where the real data for Additional Load Controls starts
 
 #define DMP_LOADSTATE_MACHINE_WRITE_RCO_PAYLOAD_LENGTH 7        //!> the length of the payload for both implementations
+
+/**
+ * Largest property value of an A_PropertyValue_Response or A_PropertyValue_Write in octets: the APDU holds 5 octets
+ * before the value (KNX 3/3/7 3.4.4), so the maximum APDU length - 5, which also fits into the telegram buffer.
+ * 10 with the default SBLIB_MAX_APDU_LENGTH 15.
+ */
+#define PROPERTY_MAX_VALUE_LENGTH (SBLIB_MAX_APDU_LENGTH - 5)
 
 
 /** Number of interface/property objects */
@@ -446,7 +454,7 @@ protected:
      * The properties of the device object
      * See KNX Spec 06 Profiles/Annex A p.103 and 9/4/1 p.50
      */
-    const PropertyDef deviceObjectProps[12] =
+    const PropertyDef deviceObjectProps[13] =
     {
         /** Interface object type: 2 bytes */
         {PID_OBJECT_TYPE, PDT_UNSIGNED_INT, OT_DEVICE},
@@ -482,6 +490,9 @@ protected:
 
         /** Hardware type: 6 byte data */
         {PID_HARDWARE_TYPE, PDT_GENERIC_06 | PC_WRITABLE | PC_POINTER, PD_USER_EEPROM_OFFSET(orderOffset)},
+
+        /** Maximum APDU length for management: 2 bytes, 15..254 (KNX 3/5/1 4.3.7) */
+        {PID_MAX_APDULENGTH, PDT_UNSIGNED_INT, SBLIB_MAX_APDU_LENGTH},
 
         /** End of table */
         PROPERTY_DEF_TABLE_END
