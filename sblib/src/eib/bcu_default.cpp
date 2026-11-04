@@ -21,6 +21,24 @@
 #   include <sblib/serial.h>
 #endif
 
+/*
+ * Mask of the number field of A_Memory_Read and A_Memory_Write and the largest number of octets of an
+ * A_Memory_Response: 1..63 octets (KNX 3/3/7 3.5.3, 3.5.4, 6 bit field), at most the maximum APDU length - 3,
+ * which also fits into the telegram buffer. With the default 15 the 4 bit mask and the limit 12 are unchanged,
+ * so the generated code stays the same.
+ */
+#if SBLIB_MAX_APDU_LENGTH > 15
+#   define MEMORY_NUMBER_MASK (0x3f)
+#   if SBLIB_MAX_APDU_LENGTH - 3 < 63
+#      define MEMORY_MAX_NUMBER (SBLIB_MAX_APDU_LENGTH - 3)
+#   else
+#      define MEMORY_MAX_NUMBER (63)
+#   endif
+#else
+#   define MEMORY_NUMBER_MASK (0x0f)
+#   define MEMORY_MAX_NUMBER (12)
+#endif
+
 /// BcuDefault is only created with the user EEPROM of BCU1 or BCU2, both provide the setters of UserEepromBCU1
 static UserEepromBCU1* eepromBCU1(UserEeprom* userEeprom)
 {
@@ -475,7 +493,7 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
 
         case APCI_MEMORY_READ_PDU:
         case APCI_MEMORY_WRITE_PDU:
-            count = telegram[telegramTpciIndex(telegram) + 1] & 0x0f; // number of data bytes
+            count = telegram[telegramTpciIndex(telegram) + 1] & MEMORY_NUMBER_MASK; // number of data bytes
             address = makeWord(telegram[telegramTpciIndex(telegram) + 2],
                                telegram[telegramTpciIndex(telegram) + 3]); // address of the data block
 
@@ -508,7 +526,7 @@ bool BcuDefault::processApci(ApciCommand apciCmd, unsigned char* telegram, const
 
             if (apciCmd == APCI_MEMORY_READ_PDU)
             {
-                if (count > 12)
+                if (count > MEMORY_MAX_NUMBER)
                 {
                     // number exceeds the maximum APDU length, respond with number 0
                     count = 0;
