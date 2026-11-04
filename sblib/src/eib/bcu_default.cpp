@@ -12,6 +12,7 @@
 #include "sblib/eib/knx_lpdu.h"
 #include "sblib/eib/knx_npdu.h"
 #include "sblib/eib/bus.h"
+#include "sblib/eib/userEepromBCU1.h"
 #include "sblib/bits.h"
 #include <cstring>
 
@@ -19,6 +20,12 @@
 #if defined(INCLUDE_SERIAL)
 #   include <sblib/serial.h>
 #endif
+
+/// BcuDefault is only created with the user EEPROM of BCU1 or BCU2, both provide the setters of UserEepromBCU1
+static UserEepromBCU1* eepromBCU1(UserEeprom* userEeprom)
+{
+    return static_cast<UserEepromBCU1*>(userEeprom);
+}
 
 BcuDefault::BcuDefault(UserRam* userRam, UserEeprom* userEeprom, ComObjects* comObjects, AddrTables* addrTables) :
     BcuBase(userRam, addrTables),
@@ -85,16 +92,16 @@ void BcuDefault::begin(const int manufacturer, const int deviceType, const int v
     userRam->runState() = 1;
 
     ///\todo why we touch runError here ? KNX spec 2.1 9/4/1 4.1.10.3.13 p.31 states "They shall be explicitly cleared by a management-tool."
-    userEeprom->runError() = 0xff;
-    userEeprom->portADDR() = 0;
+    eepromBCU1(userEeprom)->setRunError(0xff);
+    eepromBCU1(userEeprom)->setPortADDR(0);
 
-    userEeprom->manufacturerH() = HIGH_BYTE(manufacturer);
-    userEeprom->manufacturerL() = lowByte(manufacturer);
+    eepromBCU1(userEeprom)->setManufacturerH(HIGH_BYTE(manufacturer));
+    eepromBCU1(userEeprom)->setManufacturerL(lowByte(manufacturer));
 
-    userEeprom->deviceTypeH() = HIGH_BYTE(deviceType);
-    userEeprom->deviceTypeL() = lowByte(deviceType);
+    eepromBCU1(userEeprom)->setDeviceTypeH(HIGH_BYTE(deviceType));
+    eepromBCU1(userEeprom)->setDeviceTypeL(lowByte(deviceType));
 
-    userEeprom->version() = version;
+    eepromBCU1(userEeprom)->setVersion(version);
 
     userEeprom->modified(false);
 }
@@ -103,8 +110,7 @@ void BcuDefault::setOwnAddress(const uint16_t addr)
 {
     if (addr != makeWord(userEeprom->addrTab()[0], userEeprom->addrTab()[1]))
     {
-        userEeprom->addrTab()[0] = HIGH_BYTE(addr);
-        userEeprom->addrTab()[1] = lowByte(addr);
+        eepromBCU1(userEeprom)->setOwnAddressInAddrTable(addr);
         userEeprom->modified(true);
     }
     BcuBase::setOwnAddress(addr);
@@ -351,14 +357,16 @@ bool BcuDefault::processApciMemoryOperation(unsigned int addressStart, uint8_t* 
         if (userEeprom->inRange(addressStart, addressEnd)) // start & end in userEeprom ?
         {
             const int copyCount = addressEnd - addressStart + 1;
-            uint8_t* mem = this->userMemoryPtr(addressStart);
             if (readMem)
             {
-                memcpy(&payLoad[0], mem, copyCount);
+                memcpy(&payLoad[0], this->userMemoryPtr(addressStart), copyCount);
             }
             else
             {
-                memcpy(mem, &payLoad[0], copyCount);
+                if (!userEeprom->write(addressStart, &payLoad[0], copyCount))
+                {
+                    return (false);
+                }
                 userEeprom->modified(true);
             }
             DB_MEM_OPS(serial.println(" -> EEPROM ", copyCount, DEC));
@@ -368,14 +376,16 @@ bool BcuDefault::processApciMemoryOperation(unsigned int addressStart, uint8_t* 
         {
             // start is in USER_EEPROM, but payLoad is too long, we need to cut it down to fit
             const int copyCount = (userEeprom->endAddr() - addressStart + 1);
-            uint8_t* mem = this->userMemoryPtr(addressStart);
             if (readMem)
             {
-                memcpy(&payLoad[0], mem, copyCount);
+                memcpy(&payLoad[0], this->userMemoryPtr(addressStart), copyCount);
             }
             else
             {
-                memcpy(mem, &payLoad[0], copyCount);
+                if (!userEeprom->write(addressStart, &payLoad[0], copyCount))
+                {
+                    return (false);
+                }
                 userEeprom->modified(true);
             }
             addressStart += copyCount;
