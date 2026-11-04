@@ -454,7 +454,7 @@ protected:
      * The properties of the device object
      * See KNX Spec 06 Profiles/Annex A p.103 and 9/4/1 p.50
      */
-    const PropertyDef deviceObjectProps[12] =
+    const PropertyDef deviceObjectProps[13] =
     {
         /** Interface object type: 2 bytes */
         {PID_OBJECT_TYPE, PDT_UNSIGNED_INT, OT_DEVICE},
@@ -490,6 +490,9 @@ protected:
 
         /** Hardware type: 6 byte data */
         {PID_HARDWARE_TYPE, PDT_GENERIC_06 | PC_WRITABLE | PC_POINTER, PD_USER_EEPROM_OFFSET(orderOffset)},
+
+        /** Maximum APDU length for management: 2 bytes, 15..254 (KNX 3/5/1 4.3.7) */
+        {PID_MAX_APDULENGTH, PDT_UNSIGNED_INT, SBLIB_MAX_APDU_LENGTH},
 
         /** End of table */
         PROPERTY_DEF_TABLE_END
