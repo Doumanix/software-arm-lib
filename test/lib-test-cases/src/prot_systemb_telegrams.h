@@ -11,8 +11,9 @@
 #define PROT_SYSTEMB_TELEGRAMS_H_
 
 // SYSTEM B: building blocks for one connected property exchange (request, T_ACK, response, T_ACK) with sequence number seq
-#define TPCI_DATA(seq) (0x43 + 4 * (seq))
-#define TPCI_ACK(seq) (0xC2 + 4 * (seq))
+// the sequence number has 4 bit
+#define TPCI_DATA(seq) (0x43 + 4 * ((seq) & 0x0F))
+#define TPCI_ACK(seq) (0xC2 + 4 * ((seq) & 0x0F))
 #define TEL_ACK_TX(seq) {TEL_TX, 7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, TPCI_ACK(seq)}}
 #define TEL_ACK_RX(seq) {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, TPCI_ACK(seq)}}
 #define TEL_CONNECT {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}}
@@ -94,5 +95,13 @@
     {TEL_TX, 18, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x6B, TPCI_DATA(seq) - 1, 0x48, hi, lo, \
                               d0, d1, d2, d3, d4, d5, d6, d7}}, \
     TEL_ACK_RX(seq)
+
+// step function to check applicationRunning() of the SYSTEM B under test
+inline void checkSystemBApplicationRunning([[maybe_unused]] void* state, unsigned int running)
+{
+    CHECK(bcuUnderTest->applicationRunning() == (running != 0));
+}
+
+#define TEL_CHECK_APPLICATION_RUNNING(running) {LOOP, 0, 0, running, checkSystemBApplicationRunning, {0}}
 
 #endif /* PROT_SYSTEMB_TELEGRAMS_H_ */

@@ -732,13 +732,6 @@ static Telegram apciSystemBCrcTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
-static void checkSystemBApplicationRunning([[maybe_unused]] void* state, unsigned int running)
-{
-    CHECK(bcuUnderTest->applicationRunning() == (running != 0));
-}
-
-#define TEL_CHECK_APPLICATION_RUNNING(running) {LOOP, 0, 0, running, checkSystemBApplicationRunning, {0}}
-
 // the application runs if the objects 1 to 4 are loaded, the object 5 is not needed
 static Telegram apciSystemBApplicationRunningTelegrams[] =
 {
