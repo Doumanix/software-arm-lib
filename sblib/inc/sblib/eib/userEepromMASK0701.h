@@ -20,14 +20,13 @@ class UserEepromMASK0701 : public UserEepromBCU2
 {
 public:
     /// BIM112 UserEeprom range is always 0x4000 - 0xcfff and in most cases starts with the group address table
-    /// We add 0x100 before it (0x3f00-0x3fff) to save e.g. load states, table addresses, ...
-    ///\todo offset addresses are currently broken, see Issue #112
-    ///      https://github.com/selfbus/software-arm-lib/issues/112
+    /// We add 0x100 before it (0x3f00-0x3fff), the load states, table addresses, ... are saved at 0x3f70-0x3fd5,
+    /// see Issue #112 https://github.com/selfbus/software-arm-lib/issues/112
     explicit UserEepromMASK0701() : UserEepromMASK0701(0x3f00, 3072, 4096) {}
 
     /// Bytes the fields of the system interface objects (load states, table addresses, serial number, ...) are moved
-    /// down from the BCU2 layout, 0 is the BCU2 layout (0x370-0x3d5)
-    static constexpr uint16_t fieldsShiftMask0701 = 0;
+    /// down from the BCU2 layout: 0x370-0x3d5 + 0x3f00 - 0x300 = 0x3f70-0x3fd5, below the application at 0x4000
+    static constexpr uint16_t fieldsShiftMask0701 = 0x300;
 
 protected:
     // BIM M112 (Mask 0x0701) has a fixed start and size of the EEPROM, so make constructor protected
