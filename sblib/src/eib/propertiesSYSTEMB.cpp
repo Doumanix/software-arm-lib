@@ -359,10 +359,11 @@ int PropertiesSYSTEMB::loadProperty(const int objectIdx, const uint8_t* data, in
 
     if (newLoadState == LS_UNLOADED)
     {
-        // clear table reference address and MCB size on unload, the segment is free again
+        // clear table reference address, MCB size and MCB CRC on unload, the segment is free again
         UserEepromSYSTEMB* userEeprom = static_cast<UserEepromSYSTEMB*>(bcu->userEeprom);
         userEeprom->setTableAddr(objectIdx - 1, 0);
         userEeprom->setMcbSize(objectIdx - 1, 0);
+        userEeprom->setMcbCrc(objectIdx - 1, 0);
         return newLoadState;
     }
 
