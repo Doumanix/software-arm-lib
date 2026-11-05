@@ -25,11 +25,16 @@ public:
     ///      https://github.com/selfbus/software-arm-lib/issues/112
     explicit UserEepromMASK0701() : UserEepromMASK0701(0x3f00, 3072, 4096) {}
 
+    /// Bytes the fields of the system interface objects (load states, table addresses, serial number, ...) are moved
+    /// down from the BCU2 layout, 0 is the BCU2 layout (0x370-0x3d5)
+    static constexpr uint16_t fieldsShiftMask0701 = 0;
+
 protected:
     // BIM M112 (Mask 0x0701) has a fixed start and size of the EEPROM, so make constructor protected
-    UserEepromMASK0701(const uint32_t start, const uint32_t size, const uint32_t flashSize)
+    UserEepromMASK0701(const uint32_t start, const uint32_t size, const uint32_t flashSize,
+                       const uint16_t shift = fieldsShiftMask0701)
        :
-        UserEepromBCU2(start, size, flashSize) {}
+        UserEepromBCU2(start, size, flashSize, shift) {}
 };
 
 #endif /* SBLIB_KNX_USEREEPROM_MASK0701_H_ */

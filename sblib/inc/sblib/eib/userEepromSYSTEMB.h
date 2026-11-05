@@ -169,7 +169,7 @@ public:
 protected:
     UserEepromSYSTEMB(const uint32_t start, const uint32_t size, const uint32_t flashSize)
        :
-        UserEepromMASK0701(start, size, flashSize) {}
+        UserEepromMASK0701(start, size, flashSize, 0) {}
 
 private:
     friend class PropertiesSYSTEMB;
