@@ -35,6 +35,12 @@ public:
 
     uint16_t getMaskVersion() const override { return 0x7B0; }
 
+    /**
+     * The application runs if it is enabled, the run state is "running" and the address table, the association table,
+     * the group object table and the application program 1 (interface objects 1 to 4) are loaded.
+     */
+    bool applicationRunning() const override;
+
 protected:
     /** The SYSTEMB address table holds only group addresses, see AddrTablesSYSTEMB. */
     bool ownAddressInAddrTable() const override { return false; }

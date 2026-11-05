@@ -22,6 +22,7 @@
 #include <sblib/eib/apci.h>
 #include <sblib/internal/bootloader_commands.h>
 #include <protocol.h>
+#include "prot_systemb_telegrams.h"
 
 #include <catch.hpp> // If possible, include catch.hpp as last header
 
@@ -304,48 +305,6 @@ static Telegram apciPropertyValueWriteTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
-// SYSTEM B: building blocks for one connected property exchange (request, T_ACK, response, T_ACK) with sequence number seq
-#define TPCI_DATA(seq) (0x43 + 4 * (seq))
-#define TPCI_ACK(seq) (0xC2 + 4 * (seq))
-#define TEL_ACK_TX(seq) {TEL_TX, 7, 1, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x60, TPCI_ACK(seq)}}
-#define TEL_ACK_RX(seq) {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, TPCI_ACK(seq)}}
-#define TEL_CONNECT {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x80}}
-#define TEL_DISCONNECT {TEL_RX, 7, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x60, 0x81}}
-
-#define TEL_DESC_READ(seq, obj, pid) \
-    {TEL_RX, 11, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD8, obj, pid, 0x00}}, \
-    TEL_ACK_TX(seq)
-#define TEL_DESC_RESPONSE(seq, obj, pid, type, elems, access) \
-    {TEL_TX, 15, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x68, TPCI_DATA(seq), 0xD9, obj, pid, 0x00, type, 0x00, elems, access}}, \
-    TEL_ACK_RX(seq)
-
-#define TEL_VALUE_READ(seq, obj, pid) \
-    {TEL_RX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD5, obj, pid, 0x10, 0x01}}, \
-    TEL_ACK_TX(seq)
-#define TEL_VALUE_WRITE_1(seq, obj, pid, d0) \
-    {TEL_RX, 13, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD7, obj, pid, 0x10, 0x01, d0}}, \
-    TEL_ACK_TX(seq)
-#define TEL_VALUE_WRITE_5(seq, obj, pid, d0, d1, d2, d3, d4) \
-    {TEL_RX, 17, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD7, obj, pid, 0x10, 0x01, d0, d1, d2, d3, d4}}, \
-    TEL_ACK_TX(seq)
-#define TEL_VALUE_WRITE_10(seq, obj, pid, d0, d1, d2, d3, d4, d5, d6, d7, d8, d9)     {TEL_RX, 22, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x61, TPCI_DATA(seq), 0xD7, obj, pid, 0x10, 0x01, d0, d1, d2, d3, d4, d5, d6, d7, d8, d9}},     TEL_ACK_TX(seq)
-#define TEL_VALUE_RESPONSE_1(seq, obj, pid, d0) \
-    {TEL_TX, 13, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x66, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0}}, \
-    TEL_ACK_RX(seq)
-#define TEL_VALUE_RESPONSE_2(seq, obj, pid, d0, d1) \
-    {TEL_TX, 14, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x67, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0, d1}}, \
-    TEL_ACK_RX(seq)
-#define TEL_VALUE_RESPONSE_4(seq, obj, pid, d0, d1, d2, d3) \
-    {TEL_TX, 16, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x69, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0, d1, d2, d3}}, \
-    TEL_ACK_RX(seq)
-#define TEL_VALUE_RESPONSE_5(seq, obj, pid, d0, d1, d2, d3, d4) \
-    {TEL_TX, 17, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x6A, TPCI_DATA(seq), 0xD6, obj, pid, 0x10, 0x01, d0, d1, d2, d3, d4}}, \
-    TEL_ACK_RX(seq)
-
-// PID_LOAD_STATE_CONTROL (05h): write the load event, the response holds the new load state
-#define TEL_LOAD_EVENT(seq, obj, event, state)     TEL_VALUE_WRITE_10(seq, obj, 0x05, event, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00),     TEL_VALUE_RESPONSE_1(seq, obj, 0x05, state)
-// Additional Load Controls with the segment type 0Bh (data relative allocation), requested size 0x10
-#define TEL_LOAD_ADDITIONAL(seq, obj, state)     TEL_VALUE_WRITE_10(seq, obj, 0x05, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00),     TEL_VALUE_RESPONSE_1(seq, obj, 0x05, state)
 
 // load events: 00h No Operation, 01h Start Loading, 02h Load Completed, 03h Additional Load Controls, 04h Unload
 // load states: 0 Unloaded, 1 Loaded, 2 Loading, 3 Error
@@ -711,27 +670,6 @@ static Telegram apciSystemBUnloadTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
-// Data relative allocation (segment type 0Bh), the size is 16 bit here: size 4 octets, mode, fill, 2 reserved
-#define TEL_START_LOADING(seq, obj) TEL_LOAD_EVENT(seq, obj, 0x01, 0x02)
-#define TEL_ALLOC(seq, obj, sizeH, sizeL, mode, fill, state) \
-    TEL_VALUE_WRITE_10(seq, obj, 0x05, 0x03, 0x0B, 0x00, 0x00, sizeH, sizeL, mode, fill, 0x00, 0x00), \
-    TEL_VALUE_RESPONSE_1(seq, obj, 0x05, state)
-#define TEL_TABLE_REFERENCE(seq, obj, a0, a1) \
-    TEL_VALUE_READ(seq, obj, 0x07), TEL_VALUE_RESPONSE_4(seq, obj, 0x07, 0x00, 0x00, a0, a1)
-#define TEL_LOAD_STATE(seq, obj, state) TEL_VALUE_READ(seq, obj, 0x05), TEL_VALUE_RESPONSE_1(seq, obj, 0x05, state)
-// PID_MCB_TABLE: octets 2..5 hold the size, the CRC in the octets 6..7 is still 0
-#define TEL_MCB_SIZE(seq, obj, s0, s1) \
-    TEL_VALUE_READ(seq, obj, 0x1B), \
-    {TEL_TX, 20, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x6D, TPCI_DATA(seq), 0xD6, obj, 0x1B, 0x10, 0x01, \
-                              0x00, 0x00, 0x00, 0x00, s0, s1, 0x00, 0x00}}, \
-    TEL_ACK_RX(seq)
-// A_Memory_Read of 2 octets, the address is relative to the EEPROM start + 0x100 like for BCU1 (telegramPreparation())
-#define TEL_MEMORY_READ_2(seq, hi, lo, d0, d1) \
-    {TEL_RX, 10, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x64, TPCI_DATA(seq) - 1, 0x02, hi, lo}}, \
-    TEL_ACK_TX(seq), \
-    {TEL_TX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x65, TPCI_DATA(seq) - 1, 0x42, hi, lo, d0, d1}}, \
-    TEL_ACK_RX(seq)
-
 // allocation ascending from 0x3700, reallocation of object 4 keeps its base, an allocation that does not fit fails
 static Telegram apciSystemBAllocationTelegrams[] =
 {
@@ -780,6 +718,36 @@ static Telegram apciSystemBAllocationUnloadTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
+// Load Completed stores the CRC16 of the segment in the MCB. The 8 octets 01 02 .. 08 at 0x3700 (memory address 0x0500)
+// give 9795h: CRC-16/CCITT (polynomial 1021h, start value 1D0Fh, no reflection, no final XOR), see KNX 03_05_01 4.2.27.
+// The CRC is 0 for a table without a segment.
+static Telegram apciSystemBCrcTelegrams[] =
+{
+    TEL_CONNECT,
+    TEL_START_LOADING(0, 1), TEL_ALLOC(1, 1, 0x00, 0x08, 0x00, 0x00, 0x02), TEL_TABLE_REFERENCE(2, 1, 0x37, 0x00),
+    TEL_MEMORY_WRITE_8(3, 0x05, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08),
+    TEL_MEMORY_READ_8(4, 0x05, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08),
+    TEL_LOAD_EVENT(5, 1, 0x02, 0x01), TEL_MCB_SIZE_CRC(6, 1, 0x00, 0x08, 0x97, 0x95),
+    TEL_START_LOADING(7, 2), TEL_LOAD_EVENT(8, 2, 0x02, 0x01), TEL_MCB_SIZE_CRC(9, 2, 0x00, 0x00, 0x00, 0x00),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+// the application runs if the objects 1 to 4 are loaded, the object 5 is not needed
+static Telegram apciSystemBApplicationRunningTelegrams[] =
+{
+    TEL_CONNECT,
+    TEL_CHECK_APPLICATION_RUNNING(0),
+    TEL_START_LOADING(0, 1), TEL_LOAD_EVENT(1, 1, 0x02, 0x01),
+    TEL_START_LOADING(2, 2), TEL_LOAD_EVENT(3, 2, 0x02, 0x01),
+    TEL_START_LOADING(4, 4), TEL_LOAD_EVENT(5, 4, 0x02, 0x01),
+    TEL_CHECK_APPLICATION_RUNNING(0),
+    TEL_START_LOADING(6, 3), TEL_LOAD_EVENT(7, 3, 0x02, 0x01),
+    TEL_CHECK_APPLICATION_RUNNING(1),
+    TEL_LOAD_EVENT(8, 4, 0x04, 0x00),
+    TEL_CHECK_APPLICATION_RUNNING(0),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
 #define SYSTEMB_ALLOCATION_TEST_CASE(NAME, TITLE, TELEGRAMS) \
     static Test_Case NAME = {TITLE, MANUFACTURER, DEVICE, VERSION, 0, NULL, tc_setup, NULL, NULL, NULL, TELEGRAMS}
 SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBAllocation, "APCI_PROPERTY SYSTEM B allocation",
@@ -790,6 +758,10 @@ SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBAllocationFill, "APCI_PROPERTY S
                              apciSystemBAllocationFillTelegrams);
 SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBAllocationUnload, "APCI_PROPERTY SYSTEM B allocation unload",
                              apciSystemBAllocationUnloadTelegrams);
+SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBApplicationRunning, "APCI_PROPERTY SYSTEM B application running",
+                             apciSystemBApplicationRunningTelegrams);
+static Test_Case testCaseApciSystemBCrc = {"APCI_PROPERTY SYSTEM B MCB CRC", MANUFACTURER, DEVICE, VERSION, 0, NULL,
+                                           tc_setupVerifyMode, NULL, NULL, NULL, apciSystemBCrcTelegrams};
 
 static Test_Case testCaseApciSystemBObjectType =
 {
@@ -965,9 +937,21 @@ TEST_CASE("APCI processing", "[protocol][APCI]")
         executeTest(bcuTypeToTest, &testCaseApciSystemBReallocation);
         executeTest(bcuTypeToTest, &testCaseApciSystemBAllocationFill);
         executeTest(bcuTypeToTest, &testCaseApciSystemBAllocationUnload);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBCrc);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBApplicationRunning);
     }
 }
 
+
+TEST_CASE("SYSTEM B CRC16 matches the KNX example", "[protocol][APCI]")
+{
+    // KNX 03_05_01 4.2.27: the ASCII string "123456789" has the CRC E5CCh
+    const uint8_t example[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+    PropertiesSYSTEMB properties(nullptr);
+
+    CHECK(properties.crc16(example, sizeof(example)) == 0xE5CC);
+    CHECK(properties.crc16(example, 0) == 0x1D0F);
+}
 
 TEST_CASE("APCI memory services handle invalid parameters", "[protocol][APCI][apci-memory]")
 {

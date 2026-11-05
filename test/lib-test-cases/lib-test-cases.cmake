@@ -1,6 +1,7 @@
 set(SBLIB_LIB_TEST_CASES_SRC
         src/tc_tlayer4_stepfunction.h
         src/tc_tlayer4_telegram.h
+        src/prot_systemb_telegrams.h
         src/test_digital_pin.h
         src/test_ioports.h
         src/main.cpp
@@ -35,6 +36,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_stream.cpp
         src/test_buffered_stream.cpp
         src/test_prot_apci.cpp
+        src/test_prot_load_procedure_systemb.cpp
         src/test_prot_app_program.cpp
         src/test_prot_tlayer4.cpp
         src/test_prot_tlayer4_lf.cpp

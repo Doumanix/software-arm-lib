@@ -27,7 +27,7 @@ public:
     LoadState handleAllocAbsDataSegment(const int objectIdx, const uint8_t* payLoad, const int len) override;
     LoadState handleDataRelativeAllocation(const int objectIdx, const uint8_t* payLoad, const int len) override;
     LoadState handleLoadStateMachine(const int objectIdx, const uint8_t* data, const int len) override;
-    virtual uint16_t crc16(uint8_t* ptr, int len);
+    virtual uint16_t crc16(const uint8_t* ptr, int len);
     int loadProperty(int objectIdx, const uint8_t* data, int len) override;
     bool propertyValueReadTelegram(int objectIdx, PropertyID propertyId, int count, int start, uint8_t* sendBuffer) override;
     bool propertyValueWriteTelegram(int objectIdx, PropertyID propertyId, int count, int start, uint8_t* sendBuffer) override;

@@ -16,3 +16,20 @@ SYSTEMB::SYSTEMB() : SYSTEMB(new UserRamSYSTEMB(), new UserEepromSYSTEMB(), new 
 SYSTEMB::SYSTEMB(UserRamSYSTEMB* userRam, UserEepromSYSTEMB* userEeprom, ComObjectsSYSTEMB* comObjects, AddrTablesSYSTEMB* addrTables, PropertiesSYSTEMB* properties) :
     MASK0701(userRam, userEeprom, comObjects, addrTables, properties)
 {}
+
+bool SYSTEMB::applicationRunning() const
+{
+    if (!enabled)
+    {
+        return false;
+    }
+
+    // the load states are indexed by the interface object index, the application program 2 (object 5) is not part of
+    // the load procedure "Load ap1"
+    const uint8_t* loadState = userEeprom->loadState();
+    return ((userRam->runState() == 1) &&
+            (loadState[1] == LS_LOADED) &&  // address table object
+            (loadState[2] == LS_LOADED) &&  // association table object
+            (loadState[3] == LS_LOADED) &&  // group object table object
+            (loadState[4] == LS_LOADED));   // application program 1 object
+}
