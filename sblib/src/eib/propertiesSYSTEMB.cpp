@@ -123,8 +123,13 @@ LoadState PropertiesSYSTEMB::handleAllocAbsDataSegment([[maybe_unused]] const in
 }
 
 /**
- * PARTIALLY IMPLEMENTED for System_B !
- * should handle Additional Load Control: LoadEvent: DataRelativeAllocation (segment type 0x0B)
+ * Additional Load Control: LoadEvent: DataRelativeAllocation (segment type 0x0B), KNX 03_05_03 3.5.1.2
+ *
+ * The segment is allocated ascending in [UserEepromSYSTEMB::allocationStart, UserEepromSYSTEMB::allocationEnd),
+ * the first one at the start, the following ones behind the segments in use. The old segment of the table counts
+ * as free: it is allocated again at its base if it is the topmost one or if the new size fits below the next
+ * segment, otherwise behind all segments. If the segment does not fit, the table address and the MCB size are
+ * set to 0 and the load state is Error. A size of 0 is allowed. The mode 01h fills the new segment with the fill byte.
  *
  * DMP_LoadStateMachineWrite_RCo_Mem (APCI_MEMORY_WRITE_PDU) See KNX Spec. 3/5/2 3.28.2 p.109  (deprecated) or
  * DMP_LoadStateMachineWrite_RCo_IO (ApciPropertyValueWrite) See KNX Spec. 3/5/2 3.28.3.4 p.116
@@ -143,7 +148,7 @@ LoadState PropertiesSYSTEMB::handleDataRelativeAllocation(const int objectIdx, c
     // payLoad[5]    : fill (0x00)
     // payLoad[6..7] : reserved
     DB_PROPERTIES(
-        serial.print("handleDataRelativeAllocation PARTIALLY IMPLEMENTED for System_B! ");
+        serial.print("handleDataRelativeAllocation ");
         printObjectIdx(objectIdx);
         serial.print(" ");
         printData(payLoad, len);
@@ -154,47 +159,46 @@ LoadState PropertiesSYSTEMB::handleDataRelativeAllocation(const int objectIdx, c
         serial.println();
     );
 
-    const unsigned int reqMemSize = ((payLoad[0] << 24) | (payLoad[1] << 16) | (payLoad[2] << 8) | payLoad[3]);
+    const uint32_t reqMemSize = (static_cast<uint32_t>(payLoad[0]) << 24) | (static_cast<uint32_t>(payLoad[1]) << 16) |
+                                (static_cast<uint32_t>(payLoad[2]) << 8) | payLoad[3];
     UserEepromSYSTEMB* userEeprom = static_cast<UserEepromSYSTEMB*>(bcu->userEeprom);
 
-    const uint16_t tableAddress[] = {
-        userEeprom->addrTabAddr(), userEeprom->assocTabAddr(), userEeprom->commsTabAddr(),
-        userEeprom->eibObjAddr(), userEeprom->commsSeg0Addr()
-    };
-
-    uint16_t virtMemAddr = 0x3A9E; ///\todo get rid of magic number USER_EEPROM_START + USER_EEPROM_SIZE
-    for (int i = 0; i < 5; i++)
+    const uint32_t tableIdx = objectIdx - 1;
+    if (tableIdx >= UserEepromSYSTEMB::mcbCount)
     {
-        if ((tableAddress[i] != 0) && (tableAddress[i] < virtMemAddr))
-            virtMemAddr = tableAddress[i];
+        return LS_ERROR;
     }
 
-    const uint16_t newAddress = virtMemAddr - reqMemSize;
-    switch (objectIdx - 1)
+    // the segment of the table is free for the new allocation, the base is the end of the other segments
+    uint32_t newAddress = userEeprom->allocatedEnd(tableIdx);
+    const uint32_t oldAddress = userEeprom->tableAddr(tableIdx);
+    if ((reqMemSize != 0) && (oldAddress >= UserEepromSYSTEMB::allocationStart) &&
+        (oldAddress < UserEepromSYSTEMB::allocationEnd))
     {
-        case 0:
-            userEeprom->setAddrTabAddr(newAddress);
-            break;
-        case 1:
-            userEeprom->setAssocTabAddr(newAddress);
-            break;
-        case 2:
-            userEeprom->setCommsTabAddr(newAddress);
-            break;
-        case 3:
-            userEeprom->setEibObjAddr(newAddress);
-            break;
-        case 4:
-            userEeprom->setCommsSeg0Addr(newAddress);
-            break;
+        // reallocation keeps the old base if the segment is the topmost one or the new size fits below the next one
+        const uint32_t nextSegment = userEeprom->nextSegmentStart(oldAddress, tableIdx);
+        if ((newAddress <= oldAddress) || (reqMemSize <= nextSegment - oldAddress))
+        {
+            newAddress = oldAddress;
+        }
     }
-    userEeprom->setMcbSize(objectIdx - 1, reqMemSize);
+
+    if ((newAddress > UserEepromSYSTEMB::allocationEnd) || (reqMemSize > UserEepromSYSTEMB::allocationEnd - newAddress))
+    {
+        // no room left, the table is not allocated
+        userEeprom->setTableAddr(tableIdx, 0);
+        userEeprom->setMcbSize(tableIdx, 0);
+        return LS_ERROR;
+    }
+
+    userEeprom->setTableAddr(tableIdx, newAddress);
+    userEeprom->setMcbSize(tableIdx, reqMemSize);
 
     // Mode = 0x01 => fill allocated memory
     if (payLoad[4] > 0)
     {
         const uint8_t fillByte = payLoad[5];
-        bcu->userEeprom->fill(virtMemAddr, reqMemSize, fillByte);
+        bcu->userEeprom->fill(newAddress, reqMemSize, fillByte);
     }
 
     return LS_LOADING;
@@ -351,26 +355,10 @@ int PropertiesSYSTEMB::loadProperty(const int objectIdx, const uint8_t* data, in
 
     if (newLoadState == LS_UNLOADED)
     {
-        // clear table reference address on unload
+        // clear table reference address and MCB size on unload, the segment is free again
         UserEepromSYSTEMB* userEeprom = static_cast<UserEepromSYSTEMB*>(bcu->userEeprom);
-        switch (objectIdx - 1)
-        {
-            case 0:
-                userEeprom->setAddrTabAddr(0);
-                break;
-            case 1:
-                userEeprom->setAssocTabAddr(0);
-                break;
-            case 2:
-                userEeprom->setCommsTabAddr(0);
-                break;
-            case 3:
-                userEeprom->setEibObjAddr(0);
-                break;
-            case 4:
-                userEeprom->setCommsSeg0Addr(0);
-                break;
-        }
+        userEeprom->setTableAddr(objectIdx - 1, 0);
+        userEeprom->setMcbSize(objectIdx - 1, 0);
         return newLoadState;
     }
 

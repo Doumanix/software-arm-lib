@@ -79,3 +79,73 @@ TEST_CASE("SYSTEM B writes size and CRC of the five MCBs", "[eeprom-setters]")
     CHECK_FALSE(eeprom.setMcbCrc(5, 1));
     delete[] eeprom.userEepromData;
 }
+
+TEST_CASE("SYSTEM B allocation area lies behind the reserved heads", "[eeprom-setters]")
+{
+    // own head 0x3300-0x337F and inherited BCU2 head 0x3670-0x36D5 are not part of the area
+    CHECK(UserEepromSYSTEMB::allocationStart == 0x3700);
+    CHECK(UserEepromSYSTEMB::allocationEnd == 0x3F00);
+    CHECK(UserEepromSYSTEMB::allocationStart > 0x36D5);
+    CHECK(UserEepromSYSTEMB::allocationEnd == UserEepromSYSTEMB::eepromStart + UserEepromSYSTEMB::eepromSize);
+
+    IAP_Init_Flash(0xff);
+    UserEepromSYSTEMB eeprom;
+    CHECK(eeprom.startAddr() == UserEepromSYSTEMB::eepromStart);
+    CHECK(eeprom.size() == UserEepromSYSTEMB::eepromSize);
+    delete[] eeprom.userEepromData;
+}
+
+TEST_CASE("SYSTEM B reads back the MCB size and the table address by index", "[eeprom-setters]")
+{
+    IAP_Init_Flash(0xff);
+    UserEepromSYSTEMB eeprom;
+
+    for (uint32_t idx = 0; idx < 5; idx++)
+    {
+        INFO("table " << idx);
+        CHECK(eeprom.mcbSize(idx) == 0);
+        CHECK(eeprom.tableAddr(idx) == 0);
+        REQUIRE(eeprom.setMcbSize(idx, 0x01020304 + idx));
+        REQUIRE(eeprom.setTableAddr(idx, 0x3700 + 0x10 * idx));
+        CHECK(eeprom.mcbSize(idx) == 0x01020304 + idx);
+        CHECK(eeprom.tableAddr(idx) == 0x3700 + 0x10 * idx);
+    }
+
+    CHECK(eeprom.addrTabAddr() == 0x3700);
+    CHECK(eeprom.commsSeg0Addr() == 0x3740);
+    CHECK(eeprom.mcbSize(5) == 0);
+    CHECK(eeprom.tableAddr(5) == 0);
+    CHECK_FALSE(eeprom.setTableAddr(5, 1));
+    delete[] eeprom.userEepromData;
+}
+
+TEST_CASE("SYSTEM B determines the end of the allocated segments", "[eeprom-setters]")
+{
+    IAP_Init_Flash(0xff);
+    UserEepromSYSTEMB eeprom;
+
+    // nothing allocated: the area starts at its beginning
+    CHECK(eeprom.allocatedEnd() == 0x3700);
+    CHECK(eeprom.nextSegmentStart(0x3700) == 0x3F00);
+
+    // table 3 at 0x3700+0x40, table 2 at 0x3740+0x20, a table with size 0 does not occupy anything
+    REQUIRE(eeprom.setTableAddr(3, 0x3700));
+    REQUIRE(eeprom.setMcbSize(3, 0x40));
+    REQUIRE(eeprom.setTableAddr(2, 0x3740));
+    REQUIRE(eeprom.setMcbSize(2, 0x20));
+    REQUIRE(eeprom.setTableAddr(0, 0x3780));
+    CHECK(eeprom.allocatedEnd() == 0x3760);
+    CHECK(eeprom.allocatedEnd(2) == 0x3740);
+    CHECK(eeprom.allocatedEnd(3) == 0x3760);
+    CHECK(eeprom.allocatedEnd(7) == 0x3760);
+
+    CHECK(eeprom.nextSegmentStart(0x3700) == 0x3700);
+    CHECK(eeprom.nextSegmentStart(0x3700, 3) == 0x3740);
+    CHECK(eeprom.nextSegmentStart(0x3741) == 0x3F00);
+
+    // a segment at the end of the 16 bit address space with a huge size does not wrap around
+    REQUIRE(eeprom.setTableAddr(1, 0xFFFF));
+    REQUIRE(eeprom.setMcbSize(1, 0xFFFFFFFF));
+    CHECK(eeprom.allocatedEnd() == 0xFFFFFFFF);
+    delete[] eeprom.userEepromData;
+}

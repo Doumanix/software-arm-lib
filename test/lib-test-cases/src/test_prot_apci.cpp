@@ -711,6 +711,86 @@ static Telegram apciSystemBUnloadTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
+// Data relative allocation (segment type 0Bh), the size is 16 bit here: size 4 octets, mode, fill, 2 reserved
+#define TEL_START_LOADING(seq, obj) TEL_LOAD_EVENT(seq, obj, 0x01, 0x02)
+#define TEL_ALLOC(seq, obj, sizeH, sizeL, mode, fill, state) \
+    TEL_VALUE_WRITE_10(seq, obj, 0x05, 0x03, 0x0B, 0x00, 0x00, sizeH, sizeL, mode, fill, 0x00, 0x00), \
+    TEL_VALUE_RESPONSE_1(seq, obj, 0x05, state)
+#define TEL_TABLE_REFERENCE(seq, obj, a0, a1) \
+    TEL_VALUE_READ(seq, obj, 0x07), TEL_VALUE_RESPONSE_4(seq, obj, 0x07, 0x00, 0x00, a0, a1)
+#define TEL_LOAD_STATE(seq, obj, state) TEL_VALUE_READ(seq, obj, 0x05), TEL_VALUE_RESPONSE_1(seq, obj, 0x05, state)
+// PID_MCB_TABLE: octets 2..5 hold the size, the CRC in the octets 6..7 is still 0
+#define TEL_MCB_SIZE(seq, obj, s0, s1) \
+    TEL_VALUE_READ(seq, obj, 0x1B), \
+    {TEL_TX, 20, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x6D, TPCI_DATA(seq), 0xD6, obj, 0x1B, 0x10, 0x01, \
+                              0x00, 0x00, 0x00, 0x00, s0, s1, 0x00, 0x00}}, \
+    TEL_ACK_RX(seq)
+// A_Memory_Read of 2 octets, the address is relative to the EEPROM start + 0x100 like for BCU1 (telegramPreparation())
+#define TEL_MEMORY_READ_2(seq, hi, lo, d0, d1) \
+    {TEL_RX, 10, 0, 0, NULL, {0xB0, 0xA0, 0x01, 0xA0, 0x00, 0x64, TPCI_DATA(seq) - 1, 0x02, hi, lo}}, \
+    TEL_ACK_TX(seq), \
+    {TEL_TX, 12, 0, 0, NULL, {0xB0, 0xA0, 0x00, 0xA0, 0x01, 0x65, TPCI_DATA(seq) - 1, 0x42, hi, lo, d0, d1}}, \
+    TEL_ACK_RX(seq)
+
+// allocation ascending from 0x3700, reallocation of object 4 keeps its base, an allocation that does not fit fails
+static Telegram apciSystemBAllocationTelegrams[] =
+{
+    TEL_CONNECT,
+    TEL_START_LOADING(0, 4), TEL_ALLOC(1, 4, 0x00, 0x40, 0x00, 0x00, 0x02),
+    TEL_TABLE_REFERENCE(2, 4, 0x37, 0x00), TEL_MCB_SIZE(3, 4, 0x00, 0x40),
+    TEL_START_LOADING(4, 3), TEL_ALLOC(5, 3, 0x00, 0x20, 0x00, 0x00, 0x02),
+    TEL_TABLE_REFERENCE(6, 3, 0x37, 0x40),
+    TEL_ALLOC(7, 4, 0x00, 0x40, 0x00, 0x00, 0x02), TEL_TABLE_REFERENCE(8, 4, 0x37, 0x00),
+    TEL_START_LOADING(9, 1), TEL_ALLOC(10, 1, 0x08, 0x00, 0x00, 0x00, 0x03),
+    TEL_TABLE_REFERENCE(11, 1, 0x00, 0x00), TEL_LOAD_STATE(12, 1, 0x03), TEL_MCB_SIZE(13, 1, 0x00, 0x00),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+// reallocation: a segment that no longer fits moves behind all segments, the topmost one keeps its base
+static Telegram apciSystemBReallocationTelegrams[] =
+{
+    TEL_CONNECT,
+    TEL_START_LOADING(0, 4), TEL_ALLOC(1, 4, 0x00, 0x40, 0x00, 0x00, 0x02),
+    TEL_START_LOADING(2, 3), TEL_ALLOC(3, 3, 0x00, 0x20, 0x00, 0x00, 0x02),
+    TEL_ALLOC(4, 4, 0x00, 0x50, 0x00, 0x00, 0x02), TEL_TABLE_REFERENCE(5, 4, 0x37, 0x60),
+    TEL_ALLOC(6, 4, 0x00, 0x20, 0x00, 0x00, 0x02), TEL_TABLE_REFERENCE(7, 4, 0x37, 0x60),
+    TEL_MCB_SIZE(8, 4, 0x00, 0x20), TEL_TABLE_REFERENCE(9, 3, 0x37, 0x40),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+// mode 1 fills the new segment with the fill byte from its base on (memory addresses 0x0510 and 0x051E are 0x3710 and 0x371E)
+static Telegram apciSystemBAllocationFillTelegrams[] =
+{
+    TEL_CONNECT,
+    TEL_START_LOADING(0, 2), TEL_ALLOC(1, 2, 0x00, 0x10, 0x00, 0x00, 0x02),
+    TEL_START_LOADING(2, 3), TEL_ALLOC(3, 3, 0x00, 0x10, 0x01, 0xA5, 0x02),
+    TEL_TABLE_REFERENCE(4, 3, 0x37, 0x10),
+    TEL_MEMORY_READ_2(5, 0x05, 0x10, 0xA5, 0xA5), TEL_MEMORY_READ_2(6, 0x05, 0x1E, 0xA5, 0xA5),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+// unload clears the table reference and the MCB size, the next allocation uses the freed range
+static Telegram apciSystemBAllocationUnloadTelegrams[] =
+{
+    TEL_CONNECT,
+    TEL_START_LOADING(0, 4), TEL_ALLOC(1, 4, 0x00, 0x40, 0x00, 0x00, 0x02),
+    TEL_LOAD_EVENT(2, 4, 0x04, 0x00), TEL_TABLE_REFERENCE(3, 4, 0x00, 0x00), TEL_MCB_SIZE(4, 4, 0x00, 0x00),
+    TEL_START_LOADING(5, 5), TEL_ALLOC(6, 5, 0x00, 0x20, 0x00, 0x00, 0x02),
+    TEL_TABLE_REFERENCE(7, 5, 0x37, 0x00),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
+#define SYSTEMB_ALLOCATION_TEST_CASE(NAME, TITLE, TELEGRAMS) \
+    static Test_Case NAME = {TITLE, MANUFACTURER, DEVICE, VERSION, 0, NULL, tc_setup, NULL, NULL, NULL, TELEGRAMS}
+SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBAllocation, "APCI_PROPERTY SYSTEM B allocation",
+                             apciSystemBAllocationTelegrams);
+SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBReallocation, "APCI_PROPERTY SYSTEM B reallocation",
+                             apciSystemBReallocationTelegrams);
+SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBAllocationFill, "APCI_PROPERTY SYSTEM B allocation fill",
+                             apciSystemBAllocationFillTelegrams);
+SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBAllocationUnload, "APCI_PROPERTY SYSTEM B allocation unload",
+                             apciSystemBAllocationUnloadTelegrams);
+
 static Test_Case testCaseApciSystemBObjectType =
 {
     "APCI_PROPERTY SYSTEM B object types",
@@ -881,6 +961,10 @@ TEST_CASE("APCI processing", "[protocol][APCI]")
         executeTest(bcuTypeToTest, &testCaseApciSystemBLoadState);
         executeTest(bcuTypeToTest, &testCaseApciSystemBElementCount);
         executeTest(bcuTypeToTest, &testCaseApciSystemBUnload);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBAllocation);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBReallocation);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBAllocationFill);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBAllocationUnload);
     }
 }
 
