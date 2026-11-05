@@ -374,7 +374,12 @@ void ComObjects::sendGroupWriteTelegram(const int objno, const int addr, const b
     ///\todo Set routing count according to the parameters set from ETS in the EEPROM, add ID/objno for result association from bus-layer
     initLpdu(sendBuffer, objectPriority(*this, objno), false, FRAME_STANDARD);
     setDestinationAddress(sendBuffer, addr);
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // APDU: APCI octet and the value; an APDU above 15 octets is sent as L_Data_Extended frame (KNX 3/2/2 2.2.5.1)
+    telegramSetGroupApduLength(sendBuffer, objSize + 1);
+#else
     telegramSetGroupApduLength(sendBuffer, (objSize + 1) & 0x0f);
+#endif
 
     isResponse ? cmd = APCI_GROUP_VALUE_RESPONSE_PDU : cmd = APCI_GROUP_VALUE_WRITE_PDU;
 
