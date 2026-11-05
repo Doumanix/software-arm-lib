@@ -24,6 +24,9 @@ class MASK0701;
 #undef PD_USER_EEPROM_OFFSET
 #define PD_USER_EEPROM_OFFSET(v) (UserEepromMASK0701::v + PPT_USER_EEPROM)
 
+#undef PD_USER_EEPROM_FIELD_OFFSET
+#define PD_USER_EEPROM_FIELD_OFFSET(v) (UserEepromMASK0701::v + PPT_USER_EEPROM_FIELD)
+
 class PropertiesMASK0701 : public PropertiesBCU2
 {
 public:

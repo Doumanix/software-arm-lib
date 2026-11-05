@@ -495,6 +495,7 @@ enum PropertyPointerType
 {
     PPT_USER_RAM = 0,         //!< Pointer to user RAM
     PPT_USER_EEPROM = 0x4000, //!< Pointer to user EEPROM
+    PPT_USER_EEPROM_FIELD = 0x5000, //!< Pointer to a field of the system interface objects in user EEPROM
     PPT_MASK = 0x7000,        //!< Bitmask for property pointer types
     PPT_OFFSET_MASK = 0x0fff  //!< Bitmask for property pointer offsets
 };

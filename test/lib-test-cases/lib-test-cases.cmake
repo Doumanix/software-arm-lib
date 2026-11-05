@@ -42,6 +42,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_prot_tlayer4.cpp
         src/test_prot_tlayer4_lf.cpp
         src/test_prot_memory_lf.cpp
+        src/test_prot_mask0701_offsets.cpp
         src/timeout_test.cpp
         src/test_hashing_testcases.h
         src/knx/test_memory.h

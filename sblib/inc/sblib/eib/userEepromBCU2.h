@@ -31,48 +31,64 @@ public:
     [[nodiscard]] virtual uint32_t orderInfoSize() const { return 10; };
 
     [[nodiscard]] virtual uint8_t& appType() const { return directAccess_8(appTypeOffset); }
-    [[nodiscard]] virtual uint8_t* loadState() const { return &directAccess_8(loadStateOffset); }
-    [[nodiscard]] virtual uint16_t& commsTabAddr() const { return directAccess_16(commsTabAddrOffset); }
-    [[nodiscard]] virtual uint16_t& commsSeg0Addr() const { return directAccess_16(commsSeg0AddrOffset); }
-    [[nodiscard]] virtual uint16_t& commsSeg1Addr() const { return directAccess_16(commsSeg1AddrOffset); }
-    [[nodiscard]] virtual uint16_t& eibObjAddr() const { return directAccess_16(eibObjAddrOffset); }
-    [[nodiscard]] virtual uint8_t& eibObjCount() const { return directAccess_8(eibObjCountOffset); }
-    [[nodiscard]] virtual uint16_t& addrTabAddr() const { return directAccess_16(addrTabAddrOffset); }
-    [[nodiscard]] virtual uint16_t& assocTabAddr() const { return directAccess_16(assocTabAddrOffset); }
-    [[nodiscard]] virtual uint8_t* serial() const { return &directAccess_8(serialOffset); }
-    [[nodiscard]] virtual uint8_t* order() const { return &directAccess_8(orderOffset); }
+    [[nodiscard]] virtual uint8_t* loadState() const { return &directAccess_8(fieldOffset(loadStateOffset)); }
+    [[nodiscard]] virtual uint16_t& commsTabAddr() const { return directAccess_16(fieldOffset(commsTabAddrOffset)); }
+    [[nodiscard]] virtual uint16_t& commsSeg0Addr() const { return directAccess_16(fieldOffset(commsSeg0AddrOffset)); }
+    [[nodiscard]] virtual uint16_t& commsSeg1Addr() const { return directAccess_16(fieldOffset(commsSeg1AddrOffset)); }
+    [[nodiscard]] virtual uint16_t& eibObjAddr() const { return directAccess_16(fieldOffset(eibObjAddrOffset)); }
+    [[nodiscard]] virtual uint8_t& eibObjCount() const { return directAccess_8(fieldOffset(eibObjCountOffset)); }
+    [[nodiscard]] virtual uint16_t& addrTabAddr() const { return directAccess_16(fieldOffset(addrTabAddrOffset)); }
+    [[nodiscard]] virtual uint16_t& assocTabAddr() const { return directAccess_16(fieldOffset(assocTabAddrOffset)); }
+    [[nodiscard]] virtual uint8_t* serial() const { return &directAccess_8(fieldOffset(serialOffset)); }
+    [[nodiscard]] virtual uint8_t* order() const { return &directAccess_8(fieldOffset(orderOffset)); }
 
-    [[nodiscard]] virtual uint8_t& padding1() const { return directAccess_8(padding1Offset); }
-    [[nodiscard]] virtual uint8_t& serviceControl() const { return directAccess_8(serviceControlOffset); }
-    [[nodiscard]] virtual uint8_t& padding2() const { return directAccess_8(padding2Offset); }
-    [[nodiscard]] virtual uint8_t* orderInfo() const { return &directAccess_8(orderInfoOffset); }
+    [[nodiscard]] virtual uint8_t& padding1() const { return directAccess_8(fieldOffset(padding1Offset)); }
+    [[nodiscard]] virtual uint8_t& serviceControl() const { return directAccess_8(fieldOffset(serviceControlOffset)); }
+    [[nodiscard]] virtual uint8_t& padding2() const { return directAccess_8(fieldOffset(padding2Offset)); }
+    [[nodiscard]] virtual uint8_t* orderInfo() const { return &directAccess_8(fieldOffset(orderInfoOffset)); }
 
     /// Setters for the fields that are written by the load state machine, they write through the Memory API.
     /// The 16 bit fields keep the byte order of the getters (low byte first), so the content is unchanged.
-    bool setCommsTabAddr(const uint16_t value) { return setShadow16(commsTabAddrOffset, value); }
-    bool setCommsSeg0Addr(const uint16_t value) { return setShadow16(commsSeg0AddrOffset, value); }
-    bool setCommsSeg1Addr(const uint16_t value) { return setShadow16(commsSeg1AddrOffset, value); }
-    bool setEibObjAddr(const uint16_t value) { return setShadow16(eibObjAddrOffset, value); }
+    bool setCommsTabAddr(const uint16_t value) { return setShadow16(fieldOffset(commsTabAddrOffset), value); }
+    bool setCommsSeg0Addr(const uint16_t value) { return setShadow16(fieldOffset(commsSeg0AddrOffset), value); }
+    bool setCommsSeg1Addr(const uint16_t value) { return setShadow16(fieldOffset(commsSeg1AddrOffset), value); }
+    bool setEibObjAddr(const uint16_t value) { return setShadow16(fieldOffset(eibObjAddrOffset), value); }
     bool setAppType(const uint8_t value) { return setUInt8(startAddr() + appTypeOffset, value); }
-    bool setSerial(const uint8_t* src, const uint32_t count) { return write(startAddr() + serialOffset, src, count); }
-    bool setOrder(const uint8_t* src, const uint32_t count) { return write(startAddr() + orderOffset, src, count); }
+    bool setSerial(const uint8_t* src, const uint32_t count)
+    {
+        return write(startAddr() + fieldOffset(serialOffset), src, count);
+    }
+    bool setOrder(const uint8_t* src, const uint32_t count)
+    {
+        return write(startAddr() + fieldOffset(orderOffset), src, count);
+    }
     bool setOrderInfo(const uint32_t index, const uint8_t value)
     {
-        return setUInt8(startAddr() + orderInfoOffset + index, value);
+        return setUInt8(startAddr() + fieldOffset(orderInfoOffset) + index, value);
     }
-    bool setEibObjCount(const uint8_t value) { return setUInt8(startAddr() + eibObjCountOffset, value); }
-    virtual bool setAddrTabAddr(const uint16_t value) { return setShadow16(addrTabAddrOffset, value); }
-    virtual bool setAssocTabAddr(const uint16_t value) { return setShadow16(assocTabAddrOffset, value); }
+    bool setEibObjCount(const uint8_t value) { return setUInt8(startAddr() + fieldOffset(eibObjCountOffset), value); }
+    virtual bool setAddrTabAddr(const uint16_t value) { return setShadow16(fieldOffset(addrTabAddrOffset), value); }
+    virtual bool setAssocTabAddr(const uint16_t value) { return setShadow16(fieldOffset(assocTabAddrOffset), value); }
     bool setLoadState(const uint32_t objectIdx, const uint8_t value)
     {
-        return setUInt8(startAddr() + loadStateOffset + objectIdx, value);
+        return setUInt8(startAddr() + fieldOffset(loadStateOffset) + objectIdx, value);
     }
+
+    /**
+     * Offset of a field of the system interface objects (load states, table addresses, service control, serial
+     * number, order info, MCBs, versions) within the EEPROM array.
+     *
+     * @param bcu2Offset  Offset of the field in the BCU2 layout, e.g. loadStateOffset
+     * @return the offset in this EEPROM, the BCU2 layout moved down by the fieldsShift of the class
+     */
+    [[nodiscard]] uint32_t fieldOffset(const uint32_t bcu2Offset) const { return bcu2Offset - fieldsShift; }
 
 protected:
     // BCU2 has no variable EEPROM start or size, so make this constructor protected
-    UserEepromBCU2(const uint32_t start, const uint32_t size, const uint32_t flashSize)
+    /// @param shift  Bytes the fields of the system interface objects are moved down from the BCU2 layout
+    UserEepromBCU2(const uint32_t start, const uint32_t size, const uint32_t flashSize, const uint16_t shift = 0)
        :
-        UserEepromBCU1(start, size, flashSize) {}
+        UserEepromBCU1(start, size, flashSize), fieldsShift(shift) {}
 
     /// Writes a 16 bit field at the given offset from the start address, low byte first like the getters
     bool setShadow16(const uint32_t offset, const uint16_t value)
@@ -86,6 +102,8 @@ private:
     ///      then remove this friend declaration
     friend class PropertiesBCU2;
     friend class PropertiesSYSTEMB;
+
+    const uint16_t fieldsShift; //!< Moves the fields of the system interface objects, 0 is the BCU2 layout
 
     static constexpr uint32_t manufacturerHOffset = 0x03; //!< 0x0103: Software manufacturer high byte
     static constexpr uint32_t portADDROffset = 0x0c; //!< 0x010c: Port A DDR settings

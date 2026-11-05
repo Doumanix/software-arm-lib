@@ -11,6 +11,7 @@
 #include <sblib/utils.h>
 #include <sblib/eib/property_types.h>
 #include <sblib/eib/bcu_default.h>
+#include <sblib/eib/userEepromBCU2.h>
 
 #if defined(INCLUDE_SERIAL)
 #   include <sblib/serial.h>
@@ -51,6 +52,10 @@ uint8_t* PropertyDef::valuePointer(BcuBase* bcu) const
             case PPT_USER_EEPROM:
                 DB_PROPERTIES(serial.println("EEPROM"););
                 return ((BcuDefault*)bcu)->userEeprom->userEepromData + offs;
+            case PPT_USER_EEPROM_FIELD:
+                DB_PROPERTIES(serial.println("EEPROM field"););
+                return ((BcuDefault*)bcu)->userEeprom->userEepromData
+                       + static_cast<UserEepromBCU2*>(((BcuDefault*)bcu)->userEeprom)->fieldOffset(offs);
             default:
                 fatalError(); // invalid property pointer type encountered
                 break;
@@ -72,6 +77,7 @@ Memory* PropertyDef::valueMemory(BcuBase* bcu) const
                 memory = bcu->userRam;
                 break;
             case PPT_USER_EEPROM:
+            case PPT_USER_EEPROM_FIELD:
                 memory = ((BcuDefault*)bcu)->userEeprom;
                 break;
             default:
@@ -87,10 +93,16 @@ uint32_t PropertyDef::valueAddress(BcuBase* bcu) const
 {
     const Memory* memory = valueMemory(bcu);
     uint32_t address = 0;
+    uint32_t offset = valAddr & PPT_OFFSET_MASK;
 
     if (memory)
     {
-        address = memory->startAddr() + (valAddr & PPT_OFFSET_MASK);
+        if ((valAddr & PPT_MASK) == PPT_USER_EEPROM_FIELD)
+        {
+            offset = static_cast<UserEepromBCU2*>(((BcuDefault*)bcu)->userEeprom)->fieldOffset(offset);
+        }
+
+        address = memory->startAddr() + offset;
     }
 
     return address;
