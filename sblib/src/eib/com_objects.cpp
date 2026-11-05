@@ -370,6 +370,13 @@ void ComObjects::sendGroupWriteTelegram(const int objno, const int addr, const b
     uint8_t addData = 0;
     ApciCommand cmd;
 
+    // The APDU is the APCI octet and the value. If it is longer than SBLIB_MAX_APDU_LENGTH, it does not fit
+    // into the frame and the telegram buffer (KNX 3/2/2 2.2.5): the send buffer is not acquired, nothing is sent.
+    if (objSize + 1 > SBLIB_MAX_APDU_LENGTH)
+    {
+        return;
+    }
+
     const auto sendBuffer = bcu->acquireSendBuffer();
     ///\todo Set routing count according to the parameters set from ETS in the EEPROM, add ID/objno for result association from bus-layer
     initLpdu(sendBuffer, objectPriority(*this, objno), false, FRAME_STANDARD);
@@ -556,6 +563,14 @@ void ComObjects::processGroupWriteTelegram(const int objno, const uint8_t* tel)
     }
 
     int count = telegramObjectSize(objno);
+
+    // The APDU is the APCI octet and the value. A value of another length does not match the field type of the
+    // object and is rejected, the object is not updated (KNX 8/3/7 v01.07.04 1.4.1.4 p. 20). Types below 7 bit carry
+    // the value in the APCI octet, their APDU length is always 1.
+    if (lpduApduLength(tel) != count + 1)
+    {
+        return;
+    }
 
     if (count > 0)
         reverseCopy(valuePtr, tel + telegramTpciIndex(tel) + 2, count);

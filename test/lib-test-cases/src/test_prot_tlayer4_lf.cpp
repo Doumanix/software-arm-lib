@@ -278,9 +278,9 @@ namespace
         // 1. Standard A_GroupValue_Write 0x1234 to 1/0/1
         {TEL_RX, 10, 0, 0x1234, lfGroupValueWritten, {0xBC, 0xA0, 0x01, 0x08, 0x01, 0xE3, 0x00, 0x80, 0x12, 0x34}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
-        // 2. Extended T_Data_Group A_GroupValue_Write 0x5678 to 1/0/1 with APDU length 20: CTRLE group address
-        {TEL_RX, 28, 0, 0x5678, lfGroupValueWritten, {0x3C, 0xE0, 0xA0, 0x01, 0x08, 0x01, 20, 0x00, 0x80, 0x56,
-                                                      0x78}},
+        // 2. Extended T_Data_Group A_GroupValue_Write 0x5678 to 1/0/1: CTRLE group address, APDU length 3 like the
+        //    value size of the object (a value of another length is rejected, KNX 8/3/7 1.4.1.4)
+        {TEL_RX, 11, 0, 0x5678, lfGroupValueWritten, {0x3C, 0xE0, 0xA0, 0x01, 0x08, 0x01, 3, 0x00, 0x80, 0x56, 0x78}},
         {CHECK_TX_BUFFER, 0, 0, 0, nullptr, {}},
         // 3. Extended frame to group address 0xA000 (same value as the own address) with TPCI 0x80:
         //    the address type is read from CTRLE, so this is a group telegram and no T_Connect
