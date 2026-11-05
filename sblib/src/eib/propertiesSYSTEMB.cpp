@@ -200,6 +200,96 @@ LoadState PropertiesSYSTEMB::handleDataRelativeAllocation(const int objectIdx, c
     return LS_LOADING;
 }
 
+/**
+ * Load State Machine of SYSTEM B, Realisation Type 1 (property based)
+ * See KNX Spec 03_05_01 4.23.2.3.3 Table 94 "Load State Machine transition table" and 03_05_03 3.5 Table 4
+ *
+ * Next state by load event (rows) and current state (columns). The states Unloading and LoadCompleting are never
+ * stored, a stored value above Error is treated like Error.
+ *
+ *                        Unloaded  Loaded   Loading  Error
+ *  No Operation (00h)    Unloaded  Loaded   Loading  Error
+ *  Start Loading (01h)   Loading   Loading  Loading  Error
+ *  Load Completed (02h)  Unloaded  Loaded   Loaded   Error
+ *  Additional (03h)      Unloaded  Error    Loading  Error    (Loading, if the segment is accepted)
+ *  Unload (04h)          Unloaded  Unloaded Unloaded Unloaded
+ *
+ * Unknown load events (03_05_01 4.23.2.3.2) and too short data leave the state unchanged, the response holds the
+ * unchanged state. Additional Load Controls in the state Loading return LS_LOADCOMPLETING, loadProperty()
+ * evaluates the segment.
+ *
+ * @param objectIdx - interface object index
+ * @param data - the Load Control data, data[0] is the load event
+ * @param len - the length of data
+ *
+ * @return new LoadState of the interface object objectIdx
+ */
+LoadState PropertiesSYSTEMB::handleLoadStateMachine(const int objectIdx, const uint8_t* data, const int len)
+{
+    LoadState currentState = LS_ERROR;
+    const uint8_t storedState = bcu->userEeprom->loadState()[objectIdx];
+    if (storedState <= LS_ERROR)
+    {
+        currentState = LoadState(storedState);
+    }
+
+    if (len < PID_LOAD_STATE_CONTROL_LENGTH)
+    {
+        return currentState;
+    }
+
+    LoadState newLoadState = currentState;
+    const auto loadControl = LoadControl(data[0] & 0x0F);
+    switch (loadControl)
+    {
+        case LC_NO_OPERATION:
+        {
+            break;
+        }
+        case LC_START_LOADING:
+        {
+            if (currentState != LS_ERROR)
+            {
+                newLoadState = LS_LOADING;
+            }
+            break;
+        }
+        case LC_LOAD_COMPLETED:
+        {
+            if (currentState == LS_LOADING)
+            {
+                newLoadState = LS_LOADED;
+            }
+            break;
+        }
+        case LC_ADDITIONAL_LOAD_CONTROLS:
+        {
+            if (currentState == LS_LOADING)
+            {
+                newLoadState = LS_LOADCOMPLETING; // internal value for loadProperty(), the segment is evaluated there
+            }
+            else if (currentState == LS_LOADED)
+            {
+                newLoadState = LS_ERROR;
+            }
+            break;
+        }
+        case LC_UNLOAD:
+        {
+            newLoadState = LS_UNLOADED;
+            break;
+        }
+        default:
+        {
+            DB_PROPERTIES(printObjectIdx(objectIdx); serial.println(" unknown loadcontrol=0x", data[0], HEX, 2); serial.println(););
+            break;
+        }
+    }
+
+    DB_PROPERTIES(serial.print("handleLoadStateMachine: "); printObjectIdx(objectIdx); serial.print(" "); printLoadState(newLoadState);serial.println(); serial.flush(););
+    return newLoadState;
+}
+
 uint16_t PropertiesSYSTEMB::crc16(uint8_t* ptr, int len)
 {
     //int len = 9;
@@ -233,7 +323,7 @@ int PropertiesSYSTEMB::loadProperty(const int objectIdx, const uint8_t* data, in
     if ((len > DMP_LOADSTATE_MACHINE_WRITE_RCO_MEM_LENGTH) || (len < DMP_LOADSTATE_MACHINE_WRITE_RCO_IO_LENGTH))
     {
         DB_PROPERTIES(serial.print("loadProperty: "); printObjectIdx(objectIdx); serial.print(" invalid "); printData(data, len););
-        return LS_ERROR;
+        return handleLoadStateMachine(objectIdx, data, 0); // the state stays unchanged
     }
 
     const LoadState newLoadState = handleLoadStateMachine(objectIdx, data, len);
@@ -262,10 +352,25 @@ int PropertiesSYSTEMB::loadProperty(const int objectIdx, const uint8_t* data, in
     if (newLoadState == LS_UNLOADED)
     {
         // clear table reference address on unload
-        const PropertyDef* def = propertyDef(objectIdx, PID_TABLE_REFERENCE);
-        uint8_t* valuePtr = def->valuePointer(bcu);
-        valuePtr[1] = 0;
-        valuePtr[0] = 0;
+        UserEepromSYSTEMB* userEeprom = static_cast<UserEepromSYSTEMB*>(bcu->userEeprom);
+        switch (objectIdx - 1)
+        {
+            case 0:
+                userEeprom->setAddrTabAddr(0);
+                break;
+            case 1:
+                userEeprom->setAssocTabAddr(0);
+                break;
+            case 2:
+                userEeprom->setCommsTabAddr(0);
+                break;
+            case 3:
+                userEeprom->setEibObjAddr(0);
+                break;
+            case 4:
+                userEeprom->setCommsSeg0Addr(0);
+                break;
+        }
         return newLoadState;
     }
 
@@ -330,6 +435,22 @@ bool PropertiesSYSTEMB::propertyValueReadTelegram(const int objectIdx, const Pro
     const auto type = (PropertyDataType)(def->control & PC_TYPE_MASK);
     const uint8_t* valuePtr = def->valuePointer(bcu);
 
+    // all properties of the property tables have exactly one element
+    const int numElements = 1;
+    if (start == 0)
+    {
+        // element 0 holds the current number of elements
+        sendBuffer[telegramTpciIndex(sendBuffer) + 6] = HIGH_BYTE(numElements);
+        sendBuffer[telegramTpciIndex(sendBuffer) + 7] = lowByte(numElements);
+        telegramAddApduLength(sendBuffer, 2);
+        return true;
+    }
+
+    if (start + count - 1 > numElements)
+    {
+        return false; // elements out of range
+    }
+
     --start;
     const int size = def->size();
     int len = count * size;
@@ -387,6 +508,18 @@ bool PropertiesSYSTEMB::propertyValueWriteTelegram(const int objectIdx, const Pr
     }
     else
     {
+        // all properties of the property tables have exactly one element
+        const int numElements = 1;
+        if (start == 0)
+        {
+            return false; // writing element 0 would reset the number of elements, not supported
+        }
+
+        if (start + count - 1 > numElements)
+        {
+            return false; // elements out of range
+        }
+
         --start;
         const int size = def->size();
         len = count * size;
