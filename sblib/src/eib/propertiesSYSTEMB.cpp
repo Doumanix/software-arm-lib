@@ -294,7 +294,7 @@ LoadState PropertiesSYSTEMB::handleLoadStateMachine(const int objectIdx, const u
     return newLoadState;
 }
 
-uint16_t PropertiesSYSTEMB::crc16(uint8_t* ptr, int len)
+uint16_t PropertiesSYSTEMB::crc16(const uint8_t* ptr, int len)
 {
     //int len = 9;
     //uint8_t data[] = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,  0x39};
@@ -332,23 +332,27 @@ int PropertiesSYSTEMB::loadProperty(const int objectIdx, const uint8_t* data, in
 
     const LoadState newLoadState = handleLoadStateMachine(objectIdx, data, len);
 
-    // When memory load is complete, calculate the crc 16 and store it in the mcb
+    // When memory load is complete, calculate the crc 16 over the segment of the table and store it in the mcb
     if (newLoadState == LS_LOADED)
     {
-        const PropertyDef* def = propertyDef(objectIdx, PID_TABLE_REFERENCE);
-        const uint8_t* valuePtr = def->valuePointer(bcu);
-        const uint16_t virtMemStart = ((valuePtr[1] << 8) + valuePtr[0]);
-        uint8_t* memStart = bcu->userMemoryPtr(virtMemStart); ///\todo read from flash, see P0 step 3
+        UserEepromSYSTEMB* userEeprom = static_cast<UserEepromSYSTEMB*>(bcu->userEeprom);
+        const uint32_t segmentAddr = userEeprom->tableAddr(objectIdx - 1);
+        const uint32_t segmentSize = userEeprom->mcbSize(objectIdx - 1);
 
-        def = propertyDef(objectIdx, PID_MCB_TABLE);
-        const uint8_t* mcbPtr = def->valuePointer(bcu);
-        const uint16_t memSize = (mcbPtr[2] << 8) + mcbPtr[3];
-
-        if (memStart != nullptr)
+        uint16_t crc = 0;
+        if ((segmentAddr != 0) && (segmentSize != 0))
         {
-            const uint16_t crc = crc16(memStart, memSize);
-            static_cast<UserEepromSYSTEMB*>(bcu->userEeprom)->setMcbCrc(objectIdx - 1, crc);
+            const uint8_t* segmentStart = nullptr;
+            if (userEeprom->inRange(segmentAddr, segmentAddr + segmentSize - 1))
+            {
+                segmentStart = bcu->userMemoryPtr(segmentAddr); ///\todo read from flash, see P0 step 3
+            }
+            if (segmentStart != nullptr)
+            {
+                crc = crc16(segmentStart, segmentSize);
+            }
         }
+        userEeprom->setMcbCrc(objectIdx - 1, crc);
 
         return newLoadState;
     }
