@@ -2,6 +2,8 @@
 #define SBLIB_KNX_USEREEPROM_SYSTEMB_H_
 
 #include <sblib/eib/userEepromMASK0701.h>
+#include <algorithm>
+#include <cstdint>
 
 /**
  * The BCU SYSTEM B user EEPROM
@@ -10,7 +12,20 @@ class UserEepromSYSTEMB : public UserEepromMASK0701
 {
 public:
     ///\todo check start of 0x3300, SYSTEM B has typically dynamic memory allocation
-    explicit UserEepromSYSTEMB() : UserEepromSYSTEMB(0x3300, 3072, 4096) {}
+    static constexpr uint32_t eepromStart = 0x3300; //!< 0x3300-0x3EFF
+    static constexpr uint32_t eepromSize = 3072;
+
+    /**
+     * The data relative allocation (KNX 03_05_03 3.5.1.2) hands out [allocationStart, allocationEnd) ascending.
+     * Never allocated are the own head 0x3300-0x337F (table addresses, MCBs, versions) and the head inherited from
+     * BCU2 0x3670-0x36D5 (load states, table addresses, serial number, order info, BCU2 MCBs and versions).
+     * The range 0x3380-0x366F is unused so far.
+     */
+    static constexpr uint32_t allocationOffset = 0x400;
+    static constexpr uint32_t allocationStart = eepromStart + allocationOffset; //!< 0x3700
+    static constexpr uint32_t allocationEnd = eepromStart + eepromSize;         //!< 0x3F00, behind the last address
+
+    explicit UserEepromSYSTEMB() : UserEepromSYSTEMB(eepromStart, eepromSize, 4096) {}
 
     [[nodiscard]] uint16_t& addrTabAddr() const override { return directAccess_16(addrTabAddrOffset); }
     [[nodiscard]] uint16_t& assocTabAddr() const override { return directAccess_16(assocTabAddrOffset); }
@@ -48,6 +63,107 @@ public:
 
         const uint8_t bytes[2] = {static_cast<uint8_t>(crc >> 8), static_cast<uint8_t>(crc)};
         return write(startAddr() + mcbOffsets[tableIdx] + mcbCrcOffset, bytes, 2);
+    }
+
+    /// Size of the table in its MCB, 0 if @p tableIdx is invalid
+    [[nodiscard]] uint32_t mcbSize(const uint32_t tableIdx) const
+    {
+        if (tableIdx >= mcbCount)
+        {
+            return 0;
+        }
+
+        const uint8_t* bytes = &directAccess_8(mcbOffsets[tableIdx] + mcbSizeOffset);
+        return (static_cast<uint32_t>(bytes[0]) << 24) | (static_cast<uint32_t>(bytes[1]) << 16) |
+               (static_cast<uint32_t>(bytes[2]) << 8) | bytes[3];
+    }
+
+    /// Address of the table, 0 if it is not allocated or @p tableIdx is invalid
+    [[nodiscard]] uint32_t tableAddr(const uint32_t tableIdx) const
+    {
+        switch (tableIdx)
+        {
+            case 0:
+                return addrTabAddr();
+            case 1:
+                return assocTabAddr();
+            case 2:
+                return commsTabAddr();
+            case 3:
+                return eibObjAddr();
+            case 4:
+                return commsSeg0Addr();
+            default:
+                return 0;
+        }
+    }
+
+    /// Sets the address of the table through the setters, false if @p tableIdx is invalid or the write is rejected
+    bool setTableAddr(const uint32_t tableIdx, const uint16_t value)
+    {
+        switch (tableIdx)
+        {
+            case 0:
+                return setAddrTabAddr(value);
+            case 1:
+                return setAssocTabAddr(value);
+            case 2:
+                return setCommsTabAddr(value);
+            case 3:
+                return setEibObjAddr(value);
+            case 4:
+                return setCommsSeg0Addr(value);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Upper end of the segments of the tables in use (address != 0, size != 0), at least allocationStart. The table
+     * @p exceptIdx is not counted, so that its segment is free for a new allocation.
+     *
+     * @param exceptIdx table to ignore, a value >= 5 ignores none
+     * @return first address behind the topmost segment
+     */
+    [[nodiscard]] uint32_t allocatedEnd(const uint32_t exceptIdx = mcbCount) const
+    {
+        uint32_t end = allocationStart;
+        for (uint32_t idx = 0; idx < mcbCount; idx++)
+        {
+            const uint32_t addr = tableAddr(idx);
+            const uint32_t size = mcbSize(idx);
+            if ((idx == exceptIdx) || (addr == 0) || (size == 0))
+            {
+                continue;
+            }
+
+            const uint64_t segmentEnd = static_cast<uint64_t>(addr) + size;
+            if (segmentEnd > end)
+            {
+                end = static_cast<uint32_t>(std::min<uint64_t>(segmentEnd, UINT32_MAX));
+            }
+        }
+        return end;
+    }
+
+    /**
+     * Start of the lowest segment of another table at or above @p address, size 0 segments are not counted.
+     *
+     * @param exceptIdx table to ignore, a value >= 5 ignores none
+     * @return the start address or allocationEnd if there is none
+     */
+    [[nodiscard]] uint32_t nextSegmentStart(const uint32_t address, const uint32_t exceptIdx = mcbCount) const
+    {
+        uint32_t next = allocationEnd;
+        for (uint32_t idx = 0; idx < mcbCount; idx++)
+        {
+            const uint32_t addr = tableAddr(idx);
+            if ((idx != exceptIdx) && (addr != 0) && (mcbSize(idx) != 0) && (addr >= address) && (addr < next))
+            {
+                next = addr;
+            }
+        }
+        return next;
     }
 
 protected:
