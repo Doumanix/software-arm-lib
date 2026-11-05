@@ -49,23 +49,29 @@ public:
 
     /// Setters for the fields that are written by the load state machine, they write through the Memory API.
     /// The 16 bit fields keep the byte order of the getters (low byte first), so the content is unchanged.
-    bool setCommsTabAddr(const uint16_t value) { return setShadow16(commsTabAddrOffset, value); }
-    bool setCommsSeg0Addr(const uint16_t value) { return setShadow16(commsSeg0AddrOffset, value); }
-    bool setCommsSeg1Addr(const uint16_t value) { return setShadow16(commsSeg1AddrOffset, value); }
-    bool setEibObjAddr(const uint16_t value) { return setShadow16(eibObjAddrOffset, value); }
+    bool setCommsTabAddr(const uint16_t value) { return setShadow16(fieldOffset(commsTabAddrOffset), value); }
+    bool setCommsSeg0Addr(const uint16_t value) { return setShadow16(fieldOffset(commsSeg0AddrOffset), value); }
+    bool setCommsSeg1Addr(const uint16_t value) { return setShadow16(fieldOffset(commsSeg1AddrOffset), value); }
+    bool setEibObjAddr(const uint16_t value) { return setShadow16(fieldOffset(eibObjAddrOffset), value); }
     bool setAppType(const uint8_t value) { return setUInt8(startAddr() + appTypeOffset, value); }
-    bool setSerial(const uint8_t* src, const uint32_t count) { return write(startAddr() + serialOffset, src, count); }
-    bool setOrder(const uint8_t* src, const uint32_t count) { return write(startAddr() + orderOffset, src, count); }
+    bool setSerial(const uint8_t* src, const uint32_t count)
+    {
+        return write(startAddr() + fieldOffset(serialOffset), src, count);
+    }
+    bool setOrder(const uint8_t* src, const uint32_t count)
+    {
+        return write(startAddr() + fieldOffset(orderOffset), src, count);
+    }
     bool setOrderInfo(const uint32_t index, const uint8_t value)
     {
-        return setUInt8(startAddr() + orderInfoOffset + index, value);
+        return setUInt8(startAddr() + fieldOffset(orderInfoOffset) + index, value);
     }
-    bool setEibObjCount(const uint8_t value) { return setUInt8(startAddr() + eibObjCountOffset, value); }
-    virtual bool setAddrTabAddr(const uint16_t value) { return setShadow16(addrTabAddrOffset, value); }
-    virtual bool setAssocTabAddr(const uint16_t value) { return setShadow16(assocTabAddrOffset, value); }
+    bool setEibObjCount(const uint8_t value) { return setUInt8(startAddr() + fieldOffset(eibObjCountOffset), value); }
+    virtual bool setAddrTabAddr(const uint16_t value) { return setShadow16(fieldOffset(addrTabAddrOffset), value); }
+    virtual bool setAssocTabAddr(const uint16_t value) { return setShadow16(fieldOffset(assocTabAddrOffset), value); }
     bool setLoadState(const uint32_t objectIdx, const uint8_t value)
     {
-        return setUInt8(startAddr() + loadStateOffset + objectIdx, value);
+        return setUInt8(startAddr() + fieldOffset(loadStateOffset) + objectIdx, value);
     }
 
     /**

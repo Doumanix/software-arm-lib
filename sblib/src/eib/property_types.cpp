@@ -93,10 +93,16 @@ uint32_t PropertyDef::valueAddress(BcuBase* bcu) const
 {
     const Memory* memory = valueMemory(bcu);
     uint32_t address = 0;
+    uint32_t offset = valAddr & PPT_OFFSET_MASK;
 
     if (memory)
     {
-        address = memory->startAddr() + (valAddr & PPT_OFFSET_MASK);
+        if ((valAddr & PPT_MASK) == PPT_USER_EEPROM_FIELD)
+        {
+            offset = static_cast<UserEepromBCU2*>(((BcuDefault*)bcu)->userEeprom)->fieldOffset(offset);
+        }
+
+        address = memory->startAddr() + offset;
     }
 
     return address;
