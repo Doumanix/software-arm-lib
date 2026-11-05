@@ -344,12 +344,18 @@ int ComObjects::firstObjectAddr(const int objno) const
     return (0);
 }
 
+static KNXPriority objectPriority(ComObjects& comObjects, const int objno)
+{
+    // The config octet and the control field of the frame code the priority the same way
+    return static_cast<KNXPriority>(comObjects.objectConfig(objno).config & COMCONF_PRIO_MASK);
+}
+
 void ComObjects::sendGroupReadTelegram(const int objno, const int addr)
 {
     const auto sendBuffer = bcu->acquireSendBuffer();
-    ///\todo Set routing count and priority according to the parameters set from ETS in the EEPROM, add ID/objno for result association from bus-layer
+    ///\todo Set routing count according to the parameters set from ETS in the EEPROM, add ID/objno for result association from bus-layer
     // check of spec 3.7.4. : no additional search for associations to Grp Addr for local read and possible response
-    initLpdu(sendBuffer, PRIORITY_LOW, false, FRAME_STANDARD);
+    initLpdu(sendBuffer, objectPriority(*this, objno), false, FRAME_STANDARD);
     setDestinationAddress(sendBuffer, addr);
     telegramSetGroupApduLength(sendBuffer, 1);
     setApciCommand(sendBuffer, APCI_GROUP_VALUE_READ_PDU, 0);
@@ -365,8 +371,8 @@ void ComObjects::sendGroupWriteTelegram(const int objno, const int addr, const b
     ApciCommand cmd;
 
     const auto sendBuffer = bcu->acquireSendBuffer();
-    ///\todo Set routing count and priority according to the parameters set from ETS in the EEPROM, add ID/objno for result association from bus-layer
-    initLpdu(sendBuffer, PRIORITY_LOW, false, FRAME_STANDARD);
+    ///\todo Set routing count according to the parameters set from ETS in the EEPROM, add ID/objno for result association from bus-layer
+    initLpdu(sendBuffer, objectPriority(*this, objno), false, FRAME_STANDARD);
     setDestinationAddress(sendBuffer, addr);
     telegramSetGroupApduLength(sendBuffer, (objSize + 1) & 0x0f);
 
