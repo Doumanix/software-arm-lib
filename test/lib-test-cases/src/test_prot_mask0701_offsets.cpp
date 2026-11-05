@@ -312,7 +312,7 @@ namespace
 TEST_CASE("The fields of the system interface objects of a BIM M112 do not overlap the tables",
           "[protocol][mask0701-offsets]")
 {
-    fieldsBase = 0x3F70; // 0x470 - 0x300 + 0x3F00
+    fieldsBase = 0x3F70; // 0x370 - 0x300 + 0x3F00
     executeTest(BCU_0701, &tableTestCase);
     executeTest(BCU_0705, &tableTestCase);
 }
