@@ -815,6 +815,29 @@ static Telegram apciSystemBCrcTelegrams[] =
     {END, 0, 0, 0, nullptr, {0}}
 };
 
+static void checkSystemBApplicationRunning([[maybe_unused]] void* state, unsigned int running)
+{
+    CHECK(bcuUnderTest->applicationRunning() == (running != 0));
+}
+
+#define TEL_CHECK_APPLICATION_RUNNING(running) {LOOP, 0, 0, running, checkSystemBApplicationRunning, {0}}
+
+// the application runs if the objects 1 to 4 are loaded, the object 5 is not needed
+static Telegram apciSystemBApplicationRunningTelegrams[] =
+{
+    TEL_CONNECT,
+    TEL_CHECK_APPLICATION_RUNNING(0),
+    TEL_START_LOADING(0, 1), TEL_LOAD_EVENT(1, 1, 0x02, 0x01),
+    TEL_START_LOADING(2, 2), TEL_LOAD_EVENT(3, 2, 0x02, 0x01),
+    TEL_START_LOADING(4, 4), TEL_LOAD_EVENT(5, 4, 0x02, 0x01),
+    TEL_CHECK_APPLICATION_RUNNING(0),
+    TEL_START_LOADING(6, 3), TEL_LOAD_EVENT(7, 3, 0x02, 0x01),
+    TEL_CHECK_APPLICATION_RUNNING(1),
+    TEL_LOAD_EVENT(8, 4, 0x04, 0x00),
+    TEL_CHECK_APPLICATION_RUNNING(0),
+    {END, 0, 0, 0, nullptr, {0}}
+};
+
 #define SYSTEMB_ALLOCATION_TEST_CASE(NAME, TITLE, TELEGRAMS) \
     static Test_Case NAME = {TITLE, MANUFACTURER, DEVICE, VERSION, 0, NULL, tc_setup, NULL, NULL, NULL, TELEGRAMS}
 SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBAllocation, "APCI_PROPERTY SYSTEM B allocation",
@@ -825,6 +848,8 @@ SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBAllocationFill, "APCI_PROPERTY S
                              apciSystemBAllocationFillTelegrams);
 SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBAllocationUnload, "APCI_PROPERTY SYSTEM B allocation unload",
                              apciSystemBAllocationUnloadTelegrams);
+SYSTEMB_ALLOCATION_TEST_CASE(testCaseApciSystemBApplicationRunning, "APCI_PROPERTY SYSTEM B application running",
+                             apciSystemBApplicationRunningTelegrams);
 static Test_Case testCaseApciSystemBCrc = {"APCI_PROPERTY SYSTEM B MCB CRC", MANUFACTURER, DEVICE, VERSION, 0, NULL,
                                            tc_setupVerifyMode, NULL, NULL, NULL, apciSystemBCrcTelegrams};
 
@@ -1003,6 +1028,7 @@ TEST_CASE("APCI processing", "[protocol][APCI]")
         executeTest(bcuTypeToTest, &testCaseApciSystemBAllocationFill);
         executeTest(bcuTypeToTest, &testCaseApciSystemBAllocationUnload);
         executeTest(bcuTypeToTest, &testCaseApciSystemBCrc);
+        executeTest(bcuTypeToTest, &testCaseApciSystemBApplicationRunning);
     }
 }
 
