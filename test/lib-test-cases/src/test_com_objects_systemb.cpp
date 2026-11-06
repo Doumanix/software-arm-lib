@@ -12,6 +12,8 @@
  * published by the Free Software Foundation.
  */
 #include <protocol.h>
+#include <cstring>
+#include <vector>
 
 namespace
 {
@@ -90,13 +92,41 @@ namespace
             }
         }
 
+        // SYSTEM B object type, the value size follows from it (ComObjectsSYSTEMB::objectSize())
+        void setObjectType(const int objno, const uint8_t type) { memory(ObjectTableAddress)[3 + objno * 2] = type; }
+
         void receiveWrite(const int addr, const int value)
         {
-            uint8_t telegram[9] = {};
-            // standard frame control byte, otherwise telegramTpciIndex() treats the telegram as an extended frame
-            telegram[0] = 0xBC;
-            telegram[8] = value;
-            bcu.comObjects->processGroupTelegram(addr, APCI_GROUP_VALUE_WRITE_PDU, telegram);
+            receiveWrite(addr, std::vector<uint8_t>{static_cast<uint8_t>(value)});
+        }
+
+        /**
+         * @brief Let the group objects receive an A_GroupValue_Write with value octets.
+         * @param addr       Group address
+         * @param data       Value octets after the APCI octet
+         * @param apduLength APDU length in the frame, -1 for the length of the data plus the APCI octet.
+         *                   The frame is an extended frame above 15 octets, it always holds all data octets.
+         */
+        void receiveWrite(const int addr, const std::vector<uint8_t>& data, int apduLength = -1)
+        {
+            if (apduLength < 0)
+            {
+                apduLength = static_cast<int>(data.size()) + 1;
+            }
+            std::vector<uint8_t> telegram;
+            if (apduLength > 15)
+            {
+                telegram = {0x3C, 0xE0, 0x11, 0x02, 0x00, 0x00, static_cast<uint8_t>(apduLength)};
+            }
+            else
+            {
+                // standard frame control byte, otherwise telegramTpciIndex() treats the telegram as an extended frame
+                telegram = {0xBC, 0x11, 0x02, 0x00, 0x00, static_cast<uint8_t>(0xE0 | apduLength)};
+            }
+            telegram.push_back(0x00); // TPCI T_Data_Group
+            telegram.push_back(0x80); // APCI A_GroupValue_Write
+            telegram.insert(telegram.end(), data.begin(), data.end());
+            bcu.comObjects->processGroupTelegram(addr, APCI_GROUP_VALUE_WRITE_PDU, telegram.data());
         }
 
         int firstObjectAddr(const int objno)
@@ -104,6 +134,40 @@ namespace
             return static_cast<ComObjectsProbe*>(bcu.comObjects)->firstObjectAddr(objno);
         }
     };
+
+    struct LongObject
+    {
+        uint8_t type; // SYSTEM B object type
+        int size;     // value size in octets
+    };
+
+    // values above 14 octets need an APDU above 15 octets, that is an extended frame
+    constexpr LongObject LongObjects[] = {{21, 15}, {30, 24}};
+    constexpr int LongObjectCount = sizeof(LongObjects) / sizeof(LongObjects[0]);
+
+    // object n has the group address 0x0801 + n
+    void setLongObjects(Fixture& f)
+    {
+        f.setAddressCount(LongObjectCount);
+        f.setObjects(LongObjectCount);
+        f.setAssocCount(LongObjectCount);
+        for (int i = 0; i < LongObjectCount; ++i)
+        {
+            f.putAddress(i + 1, 0x0801 + i);
+            f.setObjectType(i, LongObjects[i].type);
+            f.putAssoc(i, i + 1, i + 1);
+        }
+    }
+
+    std::vector<uint8_t> longValue(const int objno)
+    {
+        std::vector<uint8_t> value(LongObjects[objno].size);
+        for (size_t i = 0; i < value.size(); ++i)
+        {
+            value[i] = static_cast<uint8_t>(0x40 * objno + i + 1);
+        }
+        return value;
+    }
 } // namespace
 
 TEST_CASE("SYSTEMB first group address of a com object", "[com_objects_systemb]")
@@ -303,5 +367,159 @@ TEST_CASE("SYSTEMB RAM flags of the group objects", "[com_objects_systemb]")
         CHECK(f.bcu.comObjects->nextUpdatedObject() == INVALID_OBJECT_NUMBER);
         f.bcu.comObjects->objectWrite(0, 1);
         CHECK(f.bcu.comObjects->objectRead(0) == 1);
+    }
+}
+
+TEST_CASE("SYSTEMB group object values above 14 octets are sent only in an extended frame", "[com_objects_systemb]")
+{
+    for (int objno = 0; objno < LongObjectCount; ++objno)
+    {
+        const int size = LongObjects[objno].size;
+        INFO("objno " << objno << ", " << size << " octets");
+        IAP_Init_Flash(0xff);
+        Fixture f;
+        setLongObjects(f);
+        REQUIRE(f.bcu.comObjects->objectSize(objno) == size);
+
+        // mark the send buffer, it is free again afterwards
+        uint8_t* sendBuffer = f.bcu.acquireSendBuffer();
+        memset(sendBuffer, 0xa5, TelegramBufferSize);
+        f.bcu.finishedSendingTelegram(true);
+
+        const std::vector<uint8_t> value = longValue(objno);
+        f.bcu.comObjects->objectWrite(objno, value.data());
+        CHECK(f.bcu.comObjects->sendNextGroupTelegram());
+        const uint8_t* sent = f.bcu.bus->sendCurTelegram;
+#if SBLIB_MAX_APDU_LENGTH > 15
+        REQUIRE(sent != nullptr);
+        CHECK(sent[0] == 0x30); // extended frame, priority system
+        CHECK(sent[1] == 0xE0); // group address, hop count 6
+        CHECK(sent[4] == 0x08);
+        CHECK(sent[5] == 0x01 + objno);
+        CHECK(sent[6] == size + 1);
+        CHECK(sent[7] == 0x00);
+        CHECK(sent[8] == 0x80);
+        for (int i = 0; i < size; ++i)
+        {
+            INFO("octet " << i);
+            CHECK(sent[9 + i] == value[size - 1 - i]);
+        }
+#else
+        // the APDU does not fit into a standard frame: nothing is written into the send buffer and nothing is sent
+        CHECK(sent == nullptr);
+        for (int i = 0; i < TelegramBufferSize; ++i)
+        {
+            INFO("octet " << i);
+            CHECK(sendBuffer[i] == 0xa5);
+        }
+#endif
+    }
+}
+
+TEST_CASE("SYSTEMB group object values above 14 octets need the exact APDU length", "[com_objects_systemb]")
+{
+    // receive a telegram with the given APDU length and check value and update flag of the object
+    const auto receive = [](const int objno, const int apduLength, const bool updated)
+    {
+        const int size = LongObjects[objno].size;
+        INFO("objno " << objno << ", " << size << " octets, APDU length " << apduLength);
+        IAP_Init_Flash(0xff);
+        Fixture f;
+        setLongObjects(f);
+        const std::vector<uint8_t> value = longValue(objno);
+        std::vector<uint8_t> data = value;
+        while (static_cast<int>(data.size()) + 1 < apduLength)
+        {
+            data.push_back(0xee); // octets of a value that is too long
+        }
+        f.receiveWrite(0x0801 + objno, data, apduLength);
+
+        const uint8_t* objectValue = f.bcu.comObjects->objectValuePtr(objno);
+        for (int i = 0; i < size; ++i)
+        {
+            INFO("octet " << i);
+            if (updated)
+            {
+                CHECK(objectValue[i] == value[size - 1 - i]);
+            }
+            else
+            {
+                CHECK(objectValue[i] == 0);
+            }
+        }
+        if (updated)
+        {
+            CHECK(f.bcu.comObjects->nextUpdatedObject() == objno);
+        }
+        CHECK(f.bcu.comObjects->nextUpdatedObject() == INVALID_OBJECT_NUMBER);
+    };
+
+    SECTION("a standard frame changes neither value nor update flag")
+    {
+        for (int objno = 0; objno < LongObjectCount; ++objno)
+        {
+            receive(objno, 15, false);
+        }
+    }
+
+#if SBLIB_MAX_APDU_LENGTH > 15
+    SECTION("an extended frame one octet too short changes neither value nor update flag")
+    {
+        for (int objno = 0; objno < LongObjectCount; ++objno)
+        {
+            receive(objno, LongObjects[objno].size, false);
+        }
+    }
+
+    SECTION("an extended frame with the whole value updates the object")
+    {
+        for (int objno = 0; objno < LongObjectCount; ++objno)
+        {
+            receive(objno, LongObjects[objno].size + 1, true);
+        }
+    }
+
+    SECTION("an extended frame one octet too long changes neither value nor update flag")
+    {
+        for (int objno = 0; objno < LongObjectCount; ++objno)
+        {
+            receive(objno, LongObjects[objno].size + 2, false);
+        }
+    }
+#endif
+}
+
+TEST_CASE("SYSTEMB group object value one octet too long in a standard frame", "[com_objects_systemb]")
+{
+    // values above 14 octets need an extended frame, so a standard frame is checked with 13 octets (type 20)
+    IAP_Init_Flash(0xff);
+    Fixture f;
+    setLongObjects(f);
+    f.setObjectType(0, 20);
+    REQUIRE(f.bcu.comObjects->objectSize(0) == 13);
+    const uint8_t* objectValue = f.bcu.comObjects->objectValuePtr(0);
+    std::vector<uint8_t> value(14, 0x5a);
+
+    SECTION("an APDU of 15 octets changes neither value nor update flag")
+    {
+        f.receiveWrite(0x0801, value);
+        for (int i = 0; i < 13; ++i)
+        {
+            INFO("octet " << i);
+            CHECK(objectValue[i] == 0);
+        }
+        CHECK(f.bcu.comObjects->nextUpdatedObject() == INVALID_OBJECT_NUMBER);
+    }
+
+    SECTION("an APDU of 14 octets updates the object")
+    {
+        value.pop_back();
+        f.receiveWrite(0x0801, value);
+        for (int i = 0; i < 13; ++i)
+        {
+            INFO("octet " << i);
+            CHECK(objectValue[i] == 0x5a);
+        }
+        CHECK(f.bcu.comObjects->nextUpdatedObject() == 0);
     }
 }
