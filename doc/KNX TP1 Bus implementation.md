@@ -1,10 +1,10 @@
 # Functionality supported by the class Bus
 - Supported frames:
     - standard data frame 
+    - extended data frame (L_Data_Extended, see "Extended frames" below)
     - acknowledge frame
 - Not supported frames:
     - poll frame 
-    - extended frame
 - Bus-Busy detection for start of normal frames and ACK-frames
 - Collision detection for all send bytes, supports receiving of collided telegram
 - Extended collision detection for ACK frame due to possible parallel sending of devices and bus delay
@@ -23,6 +23,21 @@ Support for debugging and dumping of data on the serial line - configuration is 
 and serial support need to be started with a high baud rate (recommended 1.5Mb) in the app module. Debugging usages timer32_0 for time measurement on bit/byte level
 
 Compile time switches: see `libconfig.h` 
+
+### Extended frames
+An extended frame has the frame type bit 0 in the control field, the address type and the hop count in the
+extended control field (CTRLE) and an own length octet (KNX 3/2/2 2.2.5). The frame is received, checked and
+sent by the same state machine as a standard frame, only its length differs.
+
+The compile switch `SBLIB_MAX_APDU_LENGTH` (CMake option of the same name, see `bcu_const.h`) sets the largest
+APDU length of the library:
+- 15 (default): standard frames only, `TelegramBufferSize` is 23 octets. Extended frames are not accepted (control field check).
+- 16...254: standard and extended frames. A frame longer than the buffer is discarded without acknowledge. The Tx/Rx telegram buffers have `TelegramBufferSize = 9 + SBLIB_MAX_APDU_LENGTH`
+  octets: control field, CTRLE, source and destination address, length, TPCI, the APDU and the checksum. The largest
+  telegram has 263 octets including the checksum. `TelegramLength` is then 16 bit wide.
+
+The buffers are allocated once per bus object, the RAM use grows with the value of the switch. The frame
+layout and the limits are in KNX 3/2/2 2.2.5, they are not repeated here.
 
 ## Interface to upper layers
 See `bus.h` for details.

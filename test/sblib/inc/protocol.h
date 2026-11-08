@@ -16,6 +16,7 @@
 #include <stdio.h>
 
 #include "iap_emu.h"
+#include <sblib/eib/bcu_const.h>
 
 ///\todo Check why catch.hpp must stay in this header. Maybe it´s related to below #define #undef of private and protected
 ///      otherwise we get compiler error: expected primary-expression before 'volatile'   core_cm0.h  /sblib-test/cpu-emu line 163
@@ -88,7 +89,7 @@ struct Telegram // adding something to Telegram also requires extension of funct
     unsigned int     loopCount;
     unsigned int     variable;
     StepFunction   * stepFunction;
-    unsigned char    bytes[32]; ///\todo more space for long extended frames
+    unsigned char    bytes[TelegramBufferSize]; //!> telegram without checksum, the test framework appends the checksum byte
 };
 
 typedef void (TestCaseSetup) (Telegram* tel, uint16_t telCount);

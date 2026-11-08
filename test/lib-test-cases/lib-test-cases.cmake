@@ -53,5 +53,5 @@ set(SBLIB_LIB_TEST_CASES_SRC
 )
 # Group objects with values above 14 octets need L_Data_Extended frames (preset x64_lf254)
 if(SBLIB_MAX_APDU_LENGTH GREATER 15)
-    list(APPEND SBLIB_LIB_TEST_CASES_SRC src/test_com_objects_lf.cpp)
+    list(APPEND SBLIB_LIB_TEST_CASES_SRC src/test_com_objects_lf.cpp src/test_prot_framework_lf.cpp)
 endif()

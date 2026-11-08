@@ -20,6 +20,10 @@
 
 extern unsigned int wfiSystemTimeInc;
 
+// A line of the failure messages holds up to three characters for each telegram octet, the octet numbers four
+constexpr size_t TextBufferSize = TelegramBufferSize * 4 + 1;
+constexpr size_t MessageBufferSize = TelegramBufferSize * 16 + 256;
+
 const uint8_t dummyMaskVersionHigh = 0xDE;
 const uint8_t dummyMaskVersionLow = 0xAD;
 uint16_t bcuEepromStartAddress;
@@ -52,6 +56,12 @@ void telegramPreparation(BcuDefault* testBcu, Telegram* tel, uint16_t telCount)
     {
         if (tel->length < 10)
         {
+            continue;
+        }
+
+        if ((tel->bytes[0] & 0x80) == 0)
+        {
+            // extended frame, octet 6 is the length and the TPCI and APCI start at octet 7
             continue;
         }
 
@@ -134,6 +144,7 @@ static void addChecksum(unsigned char * telegram, unsigned int telLength)
 
 static void _handleRx(BcuDefault* currentBcu, [[maybe_unused]] Test_Case * tc, Telegram * tel, [[maybe_unused]] unsigned int testStep)
 {
+    REQUIRE(tel->length < TelegramBufferSize); // one more byte for the checksum
     tel->length++; // add one byte for checksum
     addChecksum(tel->bytes, tel->length);
 	memcpy(currentBcu->bus->telegram, tel->bytes, tel->length);
@@ -149,35 +160,36 @@ static void _checkSendTelegram(BcuDefault* currentBcu, Test_Case * tc, Telegram 
     int i;
     int mismatches = 0;
     int sendTelegramLen = telegramSize(currentBcu->bus->sendCurTelegram);
-    char msg[1025];
-    char numbers[23 * 3 + 1] = { 0 };
-    char received[23 * 3 + 1] = { 0 };
-    char expected[23 * 3 + 1] = { 0 };
-    char temp[1025];
+    char msg[MessageBufferSize];
+    char numbers[TextBufferSize] = { 0 };
+    char received[TextBufferSize] = { 0 };
+    char expected[TextBufferSize] = { 0 };
+    char temp[MessageBufferSize];
 
-    snprintf(msg, 1024, "%s: Number of bytes in send telegram %d expected %d, sent %d", tc->name, testStep,
+    snprintf(msg, sizeof(msg), "%s: Number of bytes in send telegram %d expected %d, sent %d", tc->name, testStep,
         tel->length, sendTelegramLen);
     INFO(msg);
     REQUIRE(tel->length == sendTelegramLen);
+    REQUIRE(tel->length <= TelegramBufferSize);
 
-    snprintf(msg, 1024, "%s: Send telegram %d mismatch at byte(s) ", tc->name, testStep);
+    snprintf(msg, sizeof(msg), "%s: Send telegram %d mismatch at byte(s) ", tc->name, testStep);
     for (i = 0; i < tel->length; i++)
     {
-        snprintf(temp, 255, " %2d", i + 1);
+        snprintf(temp, sizeof(temp), " %2d", i + 1);
         strcat(numbers, temp);
-        snprintf(temp, 255, " %02x", currentBcu->bus->sendCurTelegram[i]);
+        snprintf(temp, sizeof(temp), " %02x", currentBcu->bus->sendCurTelegram[i]);
         strcat(received, temp);
-        snprintf(temp, 255, " %02x", tel->bytes[i]);
+        snprintf(temp, sizeof(temp), " %02x", tel->bytes[i]);
         strcat(expected, temp);
         if (tel->bytes[i] != currentBcu->bus->sendCurTelegram[i])
         {
             mismatches++;
-            snprintf(temp, 1024, "%d, ", i + 1);
+            snprintf(temp, sizeof(temp), "%d, ", i + 1);
             strcat(msg, temp);
         }
     }
     msg[strlen(msg) - 2] = '\n'; // remove the last ', ' sequence
-    snprintf(temp, 1024, "          %s\n expected: %s\n sent:     %s", numbers, expected, received);
+    snprintf(temp, sizeof(temp), "          %s\n expected: %s\n sent:     %s", numbers, expected, received);
     strcat(msg, temp);
     INFO(msg);
     REQUIRE(mismatches == 0);
@@ -193,7 +205,7 @@ static void _handleTx(BcuDefault* currentBcu, Test_Case * tc, Telegram * tel, un
     /*
     ///\todo special handling of DeviceDescriptorResponse, we change expected maskVersion to maskVersion of current bcu
     // check for a APCI_DEVICEDESCRIPTOR_RESPONSE_PDU
-    if ((tel->length = 9) && (tel->bytes[0] == 0xB0) && ((tel->bytes[6] & 0x03) == 0x03) && (tel->bytes[7] == 0x40))
+    if ((tel->length == 10) && (tel->bytes[0] == 0xB0) && ((tel->bytes[6] & 0x03) == 0x03) && (tel->bytes[7] == 0x40))
     {
         // telegram seems to look like this
         // {0xB0, 0x11, 0x7E, 0x00, 0x01, 0x63, 0x43, 0x40, bcuMaskVersionHigh, bcuMaskVersionLow}}
@@ -224,21 +236,21 @@ static void _handleTime(BcuDefault* currentBcu, [[maybe_unused]] Test_Case * tc,
     if (s)
     {
         int i;
-        char msg[1025];
-        char numbers[23 * 3 + 1] = { 0 };
-        char received[23 * 3 + 1] = { 0 };
-        char temp[1025];
+        char msg[MessageBufferSize];
+        char numbers[TextBufferSize] = { 0 };
+        char received[TextBufferSize] = { 0 };
+        char temp[MessageBufferSize];
 
         currentBcu->bus->timerInterruptHandler();
-        snprintf(msg, 1024, "Unexpected telegram\n");
+        snprintf(msg, sizeof(msg), "Unexpected telegram\n");
         for (i = 0; i < currentBcu->bus->sendTelegramLen - 1; i++)
         {
-            snprintf(temp, 255, " %2d", i + 1);
+            snprintf(temp, sizeof(temp), " %2d", i + 1);
             strcat(numbers, temp);
-            snprintf(temp, 255, " %02x", currentBcu->bus->sendCurTelegram[i]);
+            snprintf(temp, sizeof(temp), " %02x", currentBcu->bus->sendCurTelegram[i]);
             strcat(received, temp);
         }
-        snprintf(temp, 1024, "          %s\n sent:     %s", numbers, received);
+        snprintf(temp, sizeof(temp), "          %s\n sent:     %s", numbers, received);
         strcat(msg, temp);
         FAIL(msg);
     }
