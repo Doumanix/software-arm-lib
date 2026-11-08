@@ -31,15 +31,13 @@ sent by the same state machine as a standard frame, only its length differs.
 
 The compile switch `SBLIB_MAX_APDU_LENGTH` (CMake option of the same name, see `bcu_const.h`) sets the largest
 APDU length of the library:
-- 15 (default): standard frames only, `TelegramBufferSize` is 23 octets. A frame longer than the buffer is discarded without acknowledge.
-- 16...254: standard and extended frames. The Tx/Rx telegram buffers have `TelegramBufferSize = 9 + SBLIB_MAX_APDU_LENGTH`
+- 15 (default): standard frames only, `TelegramBufferSize` is 23 octets. Extended frames are not accepted (control field check).
+- 16...254: standard and extended frames. A frame longer than the buffer is discarded without acknowledge. The Tx/Rx telegram buffers have `TelegramBufferSize = 9 + SBLIB_MAX_APDU_LENGTH`
   octets: control field, CTRLE, source and destination address, length, TPCI, the APDU and the checksum. The largest
   telegram has 263 octets including the checksum. `TelegramLength` is then 16 bit wide.
 
 The buffers are allocated once per bus object, the RAM use grows with the value of the switch. The frame
 layout and the limits are in KNX 3/2/2 2.2.5, they are not repeated here.
-
-Author of the extended frame support: Doumanix <doumanix@gmx.de> (2026)
 
 ## Interface to upper layers
 See `bus.h` for details.
