@@ -205,7 +205,7 @@ static void _handleTx(BcuDefault* currentBcu, Test_Case * tc, Telegram * tel, un
     /*
     ///\todo special handling of DeviceDescriptorResponse, we change expected maskVersion to maskVersion of current bcu
     // check for a APCI_DEVICEDESCRIPTOR_RESPONSE_PDU
-    if ((tel->length = 9) && (tel->bytes[0] == 0xB0) && ((tel->bytes[6] & 0x03) == 0x03) && (tel->bytes[7] == 0x40))
+    if ((tel->length == 10) && (tel->bytes[0] == 0xB0) && ((tel->bytes[6] & 0x03) == 0x03) && (tel->bytes[7] == 0x40))
     {
         // telegram seems to look like this
         // {0xB0, 0x11, 0x7E, 0x00, 0x01, 0x63, 0x43, 0x40, bcuMaskVersionHigh, bcuMaskVersionLow}}
