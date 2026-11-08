@@ -192,4 +192,22 @@ TEST_CASE("Test framework: extended frames in both directions", "[protocol][lf]"
     executeTest(BCU_07B0, &extendedFrameTestCase);
 }
 
+TEST_CASE("Test framework: telegramPreparation() leaves extended frames unchanged", "[protocol][lf]")
+{
+    // Octets 6 and 7 of an extended frame are the length and the TPCI. With LG 66 and TPCI 0 they look like a
+    // standard A_Memory_Read, which would move the address in the octets 8 and 9 to the EEPROM of the BCU.
+    SYSTEMB bcu;
+    Telegram tel = {TEL_RX, 8 + 66, 0, 0, nullptr, {}};
+    extendedGroupFrame(&tel, remoteAddress, firstGroupAddress, 66, 0x80, 0, 0);
+    tel.bytes[8] = 0x80;
+    tel.bytes[9] = 0xE0;
+    CHECK(tel.bytes[6] == 66);
+    CHECK(tel.bytes[7] == 0x00);
+
+    telegramPreparation(&bcu, &tel, 1);
+
+    CHECK(tel.bytes[8] == 0x80);
+    CHECK(tel.bytes[9] == 0xE0);
+}
+
 #endif // SBLIB_MAX_APDU_LENGTH > 15
