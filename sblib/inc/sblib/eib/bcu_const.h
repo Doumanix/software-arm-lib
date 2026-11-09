@@ -9,7 +9,22 @@
 
 #include <cstdint>
 
-constexpr uint16_t TelegramBufferSize = 23; //!> TL4, Tx/Rx KNX telegram buffer size in bytes to allocate
+#if !defined(SBLIB_MAX_APDU_LENGTH)
+    /**
+     * Maximum APDU length of a received telegram: number of octets after the TPCI octet (KNX 3/2/2 2.2.5).
+     * 15 accepts standard frames only, 16..254 also L_Data_Extended frames. Set by the CMake option of the same name.
+     */
+#   define SBLIB_MAX_APDU_LENGTH 15
+#endif
+
+static_assert(SBLIB_MAX_APDU_LENGTH >= 15 && SBLIB_MAX_APDU_LENGTH <= 254, "SBLIB_MAX_APDU_LENGTH must be 15..254");
+
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // CTRL, CTRLE, source, destination, length, TPCI, APDU, checksum
+    constexpr uint16_t TelegramBufferSize = 9 + SBLIB_MAX_APDU_LENGTH; //!> TL4, Tx/Rx KNX telegram buffer size in bytes to allocate
+#else
+    constexpr uint16_t TelegramBufferSize = 23; //!> TL4, Tx/Rx KNX telegram buffer size in bytes to allocate
+#endif
 
 /**
  * BCU status bits for @ref status()

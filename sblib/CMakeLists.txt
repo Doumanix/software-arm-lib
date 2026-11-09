@@ -2,6 +2,15 @@ cmake_minimum_required(VERSION 3.28)
 
 project(sblib LANGUAGES CXX VERSION 2.10)
 
+# Maximum APDU length of a received telegram (number of octets after the TPCI octet, KNX 3/2/2 2.2.5).
+# 15 is the default and accepts standard frames only. 16..254 also accepts L_Data_Extended frames;
+# the telegram buffers then grow to 9 + SBLIB_MAX_APDU_LENGTH bytes.
+set(SBLIB_MAX_APDU_LENGTH 15 CACHE STRING
+    "Maximum APDU length of a received telegram (15..254, 15: standard frames only)")
+if(NOT SBLIB_MAX_APDU_LENGTH MATCHES "^[0-9]+$" OR SBLIB_MAX_APDU_LENGTH LESS 15 OR SBLIB_MAX_APDU_LENGTH GREATER 254)
+    message(FATAL_ERROR "SBLIB_MAX_APDU_LENGTH (${SBLIB_MAX_APDU_LENGTH}) must be a number from 15 to 254")
+endif()
+
 set(CMAKE_VERBOSE_MAKEFILE ON CACHE BOOL "Enable verbose output from the build system")
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -64,6 +73,8 @@ add_library(${TARGET_X64} STATIC ${SBLIB_SRC}) # 64bit sblib
 foreach(target ${TARGET_ARM} ${TARGET_X86} ${TARGET_X64})
     # sblib
     target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+    # The telegram buffer size depends on it, so the application needs the same value
+    target_compile_definitions(${target} PUBLIC SBLIB_MAX_APDU_LENGTH=${SBLIB_MAX_APDU_LENGTH})
 endforeach()
 
 # ARM includes
