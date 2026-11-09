@@ -219,7 +219,12 @@ bool Bus::canPause(const bool waitForTelegramSent) const
 
 void Bus::prepareTelegram(uint8_t* telegram, const uint16_t length) const
 {
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // Standard frame: octets 1/2, extended frame: octets 2/3
+    lpduSetSenderAddress(telegram, ownAddress);
+#else
     setSenderAddress(telegram, ownAddress);
+#endif
 
     // Calculate the checksum
     uint8_t checksum = 0xff;
@@ -245,6 +250,17 @@ void Bus::prepareTelegram(uint8_t* telegram, const uint16_t length) const
  */
 void Bus::sendTelegram(uint8_t* telegram, const uint16_t length)
 {
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // The frame and its checksum must fit into the telegram buffers (KNX 3/2/2 2.2.5). The bus sends
+    // telegramSize() + 1 octets, so the length in the header is checked as well as the given length.
+    if ((length + 1 > TelegramBufferSize) || (telegramSize(telegram) + 1 > TelegramBufferSize))
+    {
+        IF_DEBUG(fatalError());
+        callBack->finishedSendingTelegram(false);
+        return;
+    }
+#endif
+
     prepareTelegram(telegram, length);
 
     // Wait until there is space in the sending queue
@@ -1378,11 +1394,17 @@ STATE_SWITCH:
                 }
                 // dump previous tx-telegram and repeat counter and busy retry
                 DB_TELEGRAM(
-                    for (int i =0; i < sendTelegramLen; i++)
+                    // an extended frame can be longer than the dump buffer
+                    const uint32_t txtelBufferSize = sizeof(txtelBuffer) / sizeof(txtelBuffer[0]);
+                    txtelLength = sendTelegramLen;
+                    if (txtelLength > txtelBufferSize)
+                    {
+                        txtelLength = txtelBufferSize;
+                    }
+                    for (uint32_t i = 0; i < txtelLength; i++)
                     {
                         txtelBuffer[i] = sendCurTelegram[i];
                     }
-                    txtelLength = sendTelegramLen;
                     tx_rep_count = sendRetries;
                     tx_busy_rep_count = sendBusyRetries;
                     tx_telrxerror = tx_error;
