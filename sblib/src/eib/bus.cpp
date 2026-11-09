@@ -20,7 +20,7 @@
 #include <sblib/eib/bus_debug.h>
 #include <sblib/eib/bcu_const.h>
 
-#if SBLIB_MAX_APDU_LENGTH > 15
+#if SBLIB_MAX_APDU_LENGTH > SBLIB_STANDARD_APDU_MAX_LENGTH
 namespace
 {
     /**
@@ -219,7 +219,7 @@ bool Bus::canPause(const bool waitForTelegramSent) const
 
 void Bus::prepareTelegram(uint8_t* telegram, const uint16_t length) const
 {
-#if SBLIB_MAX_APDU_LENGTH > 15
+#if SBLIB_MAX_APDU_LENGTH > SBLIB_STANDARD_APDU_MAX_LENGTH
     // Standard frame: octets 1/2, extended frame: octets 2/3
     lpduSetSenderAddress(telegram, ownAddress);
 #else
@@ -250,7 +250,7 @@ void Bus::prepareTelegram(uint8_t* telegram, const uint16_t length) const
  */
 void Bus::sendTelegram(uint8_t* telegram, const uint16_t length)
 {
-#if SBLIB_MAX_APDU_LENGTH > 15
+#if SBLIB_MAX_APDU_LENGTH > SBLIB_STANDARD_APDU_MAX_LENGTH
     // The frame and its checksum must fit into the telegram buffers (KNX 3/2/2 2.2.5). The bus sends
     // telegramSize() + 1 octets, so the length in the header is checked as well as the given length.
     if ((length + 1 > TelegramBufferSize) || (telegramSize(telegram) + 1 > TelegramBufferSize))
@@ -436,7 +436,7 @@ void Bus::handleTelegram(const bool valid)
 #ifndef BUSMONITOR // no processing if we are in monitor mode
 
     // Received a valid telegram with correct checksum and valid control byte (normal data frame with preamble bits)?
-#if SBLIB_MAX_APDU_LENGTH > 15
+#if SBLIB_MAX_APDU_LENGTH > SBLIB_STANDARD_APDU_MAX_LENGTH
     // The transport layer handles standard frames only. Extended frames are processed only with disabled transport
     // layer by applications which handle them by themselves (e.g. ft12, knx-if).
     const bool isSupportedFrameType = !isExtendedFrame(rx_telegram) ||

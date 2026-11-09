@@ -152,7 +152,7 @@ public:
     /**
       * The total length of the received telegram in telegram[].
       */
-#if SBLIB_MAX_APDU_LENGTH > 15
+#if SBLIB_MAX_APDU_LENGTH > SBLIB_STANDARD_APDU_MAX_LENGTH
     volatile uint16_t telegramLen = 0;
 #else
     volatile uint8_t telegramLen = 0;

@@ -17,13 +17,29 @@
 #   define SBLIB_MAX_APDU_LENGTH 15
 #endif
 
-static_assert(SBLIB_MAX_APDU_LENGTH >= 15 && SBLIB_MAX_APDU_LENGTH <= 254, "SBLIB_MAX_APDU_LENGTH must be 15..254");
+/**
+ * Maximum APDU length of a standard frame: number of octets after the TPCI octet (KNX 3/2/2 2.2.5).
+ * Above this length an L_Data_Extended frame is used. A #define, because it is used in #if.
+ */
+#define SBLIB_STANDARD_APDU_MAX_LENGTH 15
 
-#if SBLIB_MAX_APDU_LENGTH > 15
+constexpr uint8_t LPDU_STANDARD_HEADER_LENGTH = 7;  //!< Octets of a standard frame up to and including the TPCI octet
+constexpr uint8_t LPDU_EXTENDED_HEADER_LENGTH = 8;  //!< Octets of an extended frame up to and including the TPCI octet
+constexpr uint8_t LPDU_CHECKSUM_LENGTH = 1;         //!< Checksum octet
+
+static_assert(SBLIB_MAX_APDU_LENGTH >= SBLIB_STANDARD_APDU_MAX_LENGTH && SBLIB_MAX_APDU_LENGTH <= 254,
+              "SBLIB_MAX_APDU_LENGTH must be 15..254");
+
+#if SBLIB_MAX_APDU_LENGTH > SBLIB_STANDARD_APDU_MAX_LENGTH
     // CTRL, CTRLE, source, destination, length, TPCI, APDU, checksum
-    constexpr uint16_t TelegramBufferSize = 9 + SBLIB_MAX_APDU_LENGTH; //!> TL4, Tx/Rx KNX telegram buffer size in bytes to allocate
+    /** TL4, Tx/Rx KNX telegram buffer size in bytes to allocate */
+    constexpr uint16_t TelegramBufferSize = LPDU_EXTENDED_HEADER_LENGTH + SBLIB_MAX_APDU_LENGTH + LPDU_CHECKSUM_LENGTH;
 #else
-    constexpr uint16_t TelegramBufferSize = 23; //!> TL4, Tx/Rx KNX telegram buffer size in bytes to allocate
+    /**
+     * TL4, Tx/Rx KNX telegram buffer size in bytes to allocate, 23 octets like STANDARD_FRAME_MAX_SIZE in bus_const.h
+     */
+    constexpr uint16_t TelegramBufferSize =
+        LPDU_STANDARD_HEADER_LENGTH + SBLIB_STANDARD_APDU_MAX_LENGTH + LPDU_CHECKSUM_LENGTH;
 #endif
 
 /**
