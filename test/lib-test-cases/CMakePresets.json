@@ -29,6 +29,18 @@
             }
         },
         {
+            "name": "x64_lf254",
+            "displayName": "x64 L_Data_Extended Target",
+            "description": "x64 with SBLIB_MAX_APDU_LENGTH 254 (extended frames)",
+            "hidden": false,
+            "inherits": [
+                "x64"
+            ],
+            "cacheVariables": {
+                "SBLIB_MAX_APDU_LENGTH": "254"
+            }
+        },
+        {
             "name": "x86_logging",
             "displayName": "x86 logging Target",
             "description": "Most of logging enabled",
@@ -121,6 +133,18 @@
             ]
         },
         {
+            "name": "debug-x64-lf254",
+            "configurePreset": "x64_lf254",
+            "configuration": "Debug",
+            "displayName": "x64 L_Data_Extended Target Debug Build",
+            "description": "Build the x64 target with SBLIB_MAX_APDU_LENGTH 254 in Debug configuration",
+            "hidden": false,
+            "verbose": true,
+            "targets": [
+                "lib-test-cases_x64"
+            ]
+        },
+        {
             "name": "release-x64",
             "configurePreset": "x64",
             "configuration": "Release",
@@ -186,6 +210,17 @@
             "configuration": "Debug",
             "displayName": "x64 Target Debug Test",
             "description": "Run tests for x64 target in Debug configuration",
+            "hidden": false,
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "test-debug-x64-lf254",
+            "configurePreset": "x64_lf254",
+            "configuration": "Debug",
+            "displayName": "x64 L_Data_Extended Target Debug Test",
+            "description": "Run tests for the x64 target with SBLIB_MAX_APDU_LENGTH 254 in Debug configuration",
             "hidden": false,
             "output": {
                 "outputOnFailure": true
