@@ -20,6 +20,46 @@
 #include <sblib/eib/bus_debug.h>
 #include <sblib/eib/bcu_const.h>
 
+#if SBLIB_MAX_APDU_LENGTH > 15
+namespace
+{
+    /**
+     * @brief Check the control field and the length of a received frame (parity and checksum are correct).
+     * @details Standard frames up to 23 bytes as before. L_Data_Extended frames (KNX 3/2/2 2.2.5) only with
+     *          extended frame format 0000b and a length field below 255 that matches the received bytes.
+     *          A frame longer than the buffer was not stored completely (RX_LENGTH_ERROR): it is discarded
+     *          without acknowledge (KNX 3/2/2 2.4.2, 3/3/2 2.2.5).
+     * @param telegram The received bytes
+     * @param length   Number of received bytes including the checksum
+     * @param rxError  Error flags of the reception
+     * @return True if the frame is a data frame we may process
+     */
+    bool isValidDataFrame(const uint8_t* telegram, const uint16_t length, const uint16_t rxError)
+    {
+        if ((telegram[0] & VALID_ANY_DATA_FRAME_TYPE_MASK) != VALID_ANY_DATA_FRAME_TYPE_VALUE)
+        {
+            return false;
+        }
+
+        if (rxError & RX_LENGTH_ERROR)
+        {
+            return false;
+        }
+
+        if (!isExtendedFrame(telegram))
+        {
+            return length <= STANDARD_FRAME_MAX_SIZE;
+        }
+
+        if (length < 9 || lpduExtendedFrameFormat(telegram) != 0 || extendedFrameApduLength(telegram) == 0xff)
+        {
+            return false;
+        }
+
+        return length == extendedFrameLength(telegram) + 1;
+    }
+} // namespace
+#endif
 
 // constructor for Bus object. Initialize basic interface parameter to bus and set SM to IDLE
 Bus::Bus(AddrTables* addrTable, Timer& aTimer, const uint32_t& aRxPin, const uint32_t& aTxPin,
@@ -356,11 +396,17 @@ void Bus::handleTelegram(const bool valid)
 
     DB_TELEGRAM(
         if (nextByteIndex) {
-            for (int i = 0; i < nextByteIndex; ++i)
+            // an extended frame can be longer than the dump buffer
+            const uint32_t telBufferSize = sizeof(telBuffer) / sizeof(telBuffer[0]);
+            telLength = nextByteIndex;
+            if (telLength > telBufferSize)
+            {
+                telLength = telBufferSize;
+            }
+            for (uint32_t i = 0; i < telLength; ++i)
             {
                 telBuffer[i] = rx_telegram[i];
             }
-            telLength = nextByteIndex;
             telcollisions = collisions;
         }
     );
@@ -374,6 +420,22 @@ void Bus::handleTelegram(const bool valid)
 #ifndef BUSMONITOR // no processing if we are in monitor mode
 
     // Received a valid telegram with correct checksum and valid control byte (normal data frame with preamble bits)?
+#if SBLIB_MAX_APDU_LENGTH > 15
+    // The transport layer handles standard frames only. Extended frames are processed only with disabled transport
+    // layer by applications which handle them by themselves (e.g. ft12, knx-if).
+    const bool isSupportedFrameType = !isExtendedFrame(rx_telegram) ||
+                                      !(callBack->getLayerStatus() & BCU_STATUS_TRANSPORT_LAYER);
+
+    // Standard or extended frame, the length matches the length field
+    if (nextByteIndex >= 8 && valid && isValidDataFrame(rx_telegram, nextByteIndex, rx_error) && isSupportedFrameType)
+    {
+        const int destAddr = lpduDestinationAddress(rx_telegram);
+        bool processTel = false;
+
+        // Only process the telegram if it is for us
+        if (lpduIsGroupAddress(rx_telegram)) // group address or physical address
+        {
+#else
     //todo extended tel, check tel len, give upper layer error info
     if (nextByteIndex >= 8 && valid && ((rx_telegram[0] & VALID_DATA_FRAME_TYPE_MASK) == VALID_DATA_FRAME_TYPE_VALUE)
         && nextByteIndex <= TelegramBufferSize)
@@ -384,6 +446,7 @@ void Bus::handleTelegram(const bool valid)
         // Only process the telegram if it is for us
         if (rx_telegram[5] & 0x80) // group address or physical address
         {
+#endif
             processTel = (destAddr == 0);                                                          // broadcast
             processTel |= (addressTable != nullptr) && (addressTable->indexOfAddr(destAddr) >= 0); // known group address
         }
