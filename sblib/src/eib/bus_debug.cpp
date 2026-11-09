@@ -247,9 +247,11 @@ void dumpFrameTiming(int delta)
     {
         serial.print(" fre"); // frame early
         serial.print(" ", delta);
-        if (telLength >= 3)
+        // the sender address is in octets 1/2 of a standard frame and in octets 2/3 of an extended frame
+        const auto* tel = const_cast<unsigned char *>(telBuffer);
+        if (telLength >= lpduSenderIndex(tel) + 2u)
         {
-            const uint16_t senderAddr = makeWord(telBuffer[1], telBuffer[2]);
+            const uint16_t senderAddr = lpduSenderAddress(tel);
             serial.print(" (");
             dumpKNXAddress(senderAddr);
             serial.print(")");
