@@ -48,7 +48,7 @@ enum Hop_count_type {};
  *
  * @return The size of the telegram, excluding the checksum byte.
  */
-#if SBLIB_MAX_APDU_LENGTH > 15
+#if SBLIB_MAX_APDU_LENGTH > SBLIB_STANDARD_APDU_MAX_LENGTH
 #   define telegramSize(tel) lpduLength(tel)
 #else
 #   define telegramSize(tel) (7 + (tel[5] & 15)) //FIXME telegramSize accesses tel[5] without any check

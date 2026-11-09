@@ -23,6 +23,9 @@
 #define SBLIB_KNX_LPDU_H_
 
 #include <cstdint>
+#include "sblib/eib/bcu_const.h"
+#include "sblib/eib/bus_const.h"
+#include "sblib/eib/knx_tpdu.h"
 
 
 /**
@@ -54,6 +57,36 @@ enum KNXFrameType
     FRAME_STANDARD,
     FRAME_EXTENDED
 };
+
+/**
+ * APDU length and hop count in octet 5 of a standard frame, the hop count also in octet 1 (CTRLE) of an extended
+ * frame. The other bits of the LPDU use the existing names: SB_TEL_* of bus_const.h for the control field
+ * (octet 0), T_GROUP_ADDRESS_FLAG_Pos/_Msk of knx_tpdu.h for the address type flag (AT) in octet 5 resp. CTRLE.
+ */
+enum
+{
+    LPDU_STANDARD_LENGTH_Pos = 0,                                         //!< Position of the APDU length
+    LPDU_STANDARD_LENGTH_Msk = (0x0fUL << LPDU_STANDARD_LENGTH_Pos),      //!< Bitmask of the APDU length 0..15
+    LPDU_HOP_COUNT_Pos = 4,                                               //!< Position of the hop count
+    LPDU_HOP_COUNT_Msk = (0x07UL << LPDU_HOP_COUNT_Pos)                   //!< Bitmask of the hop count 0..7
+};
+
+/**
+ * Extended frame format (EFF) in octet 1 (CTRLE) of an extended frame
+ */
+enum
+{
+    LPDU_EXTENDED_FRAME_FORMAT_Pos = 0,                                          //!< Position of the EFF
+    LPDU_EXTENDED_FRAME_FORMAT_Msk = (0x0fUL << LPDU_EXTENDED_FRAME_FORMAT_Pos)  //!< Bitmask of the EFF 0..15
+};
+
+constexpr uint8_t LpduStandardTpciIndex = 6;  //!< Index of the TPCI octet of a standard frame
+constexpr uint8_t LpduExtendedTpciIndex = 7;  //!< Index of the TPCI octet of an extended frame
+
+static_assert(LpduStandardHeaderLength == LpduStandardTpciIndex + 1,
+              "the standard header ends with the TPCI octet");
+static_assert(LpduExtendedHeaderLength == LpduExtendedTpciIndex + 1,
+              "the extended header ends with the TPCI octet");
 
 /**
  * Initialize a KNX LPDU telegram
@@ -174,9 +207,9 @@ void setFrameType(uint8_t* telegram, KNXFrameType newFrameType);
 {
     if (isExtendedFrame(telegram))
     {
-        return 7;
+        return LpduExtendedTpciIndex;
     }
-    return 6;
+    return LpduStandardTpciIndex;
 }
 
 /**
@@ -186,7 +219,7 @@ void setFrameType(uint8_t* telegram, KNXFrameType newFrameType);
  */
 [[nodiscard]] constexpr uint8_t standardFrameApduLength(const uint8_t* telegram)
 {
-    return telegram[5] & 0x0f;
+    return telegram[5] & LPDU_STANDARD_LENGTH_Msk;
 }
 
 /**
@@ -220,7 +253,7 @@ void setFrameType(uint8_t* telegram, KNXFrameType newFrameType);
  */
 [[nodiscard]] constexpr uint16_t standardFrameLength(const uint8_t* telegram)
 {
-    return 7 + standardFrameApduLength(telegram);
+    return LpduStandardHeaderLength + standardFrameApduLength(telegram);
 }
 
 /**
@@ -230,7 +263,7 @@ void setFrameType(uint8_t* telegram, KNXFrameType newFrameType);
  */
 [[nodiscard]] constexpr uint16_t extendedFrameLength(const uint8_t* telegram)
 {
-    return 8 + extendedFrameApduLength(telegram);
+    return LpduExtendedHeaderLength + extendedFrameApduLength(telegram);
 }
 
 /**
@@ -304,7 +337,7 @@ void setFrameType(uint8_t* telegram, KNXFrameType newFrameType);
  */
 [[nodiscard]] inline bool lpduIsGroupAddress(const uint8_t* telegram)
 {
-    return (telegram[lpduAddressTypeIndex(telegram)] & 0x80) != 0;
+    return (telegram[lpduAddressTypeIndex(telegram)] & T_GROUP_ADDRESS_FLAG_Msk) != 0;
 }
 
 /**
@@ -314,7 +347,7 @@ void setFrameType(uint8_t* telegram, KNXFrameType newFrameType);
  */
 [[nodiscard]] inline uint8_t lpduHopCount(const uint8_t* telegram)
 {
-    return telegram[lpduAddressTypeIndex(telegram)] >> 4 & 0x07;
+    return static_cast<uint8_t>((telegram[lpduAddressTypeIndex(telegram)] & LPDU_HOP_COUNT_Msk) >> LPDU_HOP_COUNT_Pos);
 }
 
 /**
@@ -326,7 +359,7 @@ void setFrameType(uint8_t* telegram, KNXFrameType newFrameType);
 {
     if (isExtendedFrame(telegram))
     {
-        return telegram[1] & 0x0f;
+        return static_cast<uint8_t>((telegram[1] & LPDU_EXTENDED_FRAME_FORMAT_Msk) >> LPDU_EXTENDED_FRAME_FORMAT_Pos);
     }
     return 0;
 }
@@ -365,11 +398,11 @@ inline void lpduSetGroupAddress(uint8_t* telegram, const bool groupAddress)
     const uint8_t index = lpduAddressTypeIndex(telegram);
     if (groupAddress)
     {
-        telegram[index] |= 0x80;
+        telegram[index] |= T_GROUP_ADDRESS_FLAG_Msk;
     }
     else
     {
-        telegram[index] &= 0x7f;
+        telegram[index] &= static_cast<uint8_t>(~T_GROUP_ADDRESS_FLAG_Msk);
     }
 }
 
@@ -386,7 +419,8 @@ inline void lpduSetApduLength(uint8_t* telegram, const uint8_t apduLength)
     }
     else
     {
-        telegram[5] = static_cast<uint8_t>((telegram[5] & 0xf0) | (apduLength & 0x0f));
+        telegram[5] = static_cast<uint8_t>((telegram[5] & (T_GROUP_ADDRESS_FLAG_Msk | LPDU_HOP_COUNT_Msk)) |
+                                           (apduLength & LPDU_STANDARD_LENGTH_Msk));
     }
 }
 
@@ -406,8 +440,9 @@ inline uint8_t lpduInitStandardFrame(uint8_t* telegram, const KNXPriority newPri
                                      const uint16_t destination, const bool groupAddress, const uint8_t hopCount,
                                      const uint8_t apduLength)
 {
-    telegram[0] = static_cast<uint8_t>(0xb0 | (newPriority & 0x03) << 2);
-    telegram[5] = static_cast<uint8_t>((hopCount & 0x07) << 4);
+    telegram[0] = static_cast<uint8_t>(SB_TEL_LONG_FRAME_FLAG | SB_TEL_REPEAT_FLAG | SB_TEL_ACK_FRAME_FLAG |
+                                       ((newPriority << PRIO0_FLAG) & SB_TEL_PRIO_FLAG));
+    telegram[5] = static_cast<uint8_t>((hopCount << LPDU_HOP_COUNT_Pos) & LPDU_HOP_COUNT_Msk);
     lpduSetSenderAddress(telegram, sender);
     lpduSetDestinationAddress(telegram, destination);
     lpduSetGroupAddress(telegram, groupAddress);
@@ -431,8 +466,9 @@ inline uint8_t lpduInitExtendedFrame(uint8_t* telegram, const KNXPriority newPri
                                      const uint16_t destination, const bool groupAddress, const uint8_t hopCount,
                                      const uint8_t apduLength)
 {
-    telegram[0] = static_cast<uint8_t>(0x30 | (newPriority & 0x03) << 2);
-    telegram[1] = static_cast<uint8_t>((hopCount & 0x07) << 4);
+    telegram[0] = static_cast<uint8_t>(SB_TEL_REPEAT_FLAG | SB_TEL_ACK_FRAME_FLAG |
+                                       ((newPriority << PRIO0_FLAG) & SB_TEL_PRIO_FLAG));
+    telegram[1] = static_cast<uint8_t>((hopCount << LPDU_HOP_COUNT_Pos) & LPDU_HOP_COUNT_Msk);
     lpduSetSenderAddress(telegram, sender);
     lpduSetDestinationAddress(telegram, destination);
     lpduSetGroupAddress(telegram, groupAddress);
