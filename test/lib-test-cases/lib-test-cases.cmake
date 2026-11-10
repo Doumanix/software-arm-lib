@@ -27,6 +27,7 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/test_buffered_stream.cpp
         src/test_bus.h
         src/test_bus.cpp
+        src/test_bus_receive.cpp
         src/test_prot_apci.cpp
         src/test_prot_app_program.cpp
         src/test_prot_tlayer4.cpp
