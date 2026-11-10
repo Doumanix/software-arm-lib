@@ -40,11 +40,15 @@ set(SBLIB_LIB_TEST_CASES_SRC
         src/knx/test_user_eeprom.cpp
 )
 
-# With extended frames (preset x64_lf254) only the LPDU tests are built. The transport layer tests use a test framework
-# with buffers for standard frames and do not run with SBLIB_MAX_APDU_LENGTH > 15 yet.
+# With extended frames (preset x64_lf254) only the Bus and LPDU tests are built. The transport layer tests use a test
+# framework with buffers for standard frames and do not run with SBLIB_MAX_APDU_LENGTH > 15 yet.
 if(SBLIB_MAX_APDU_LENGTH GREATER 15)
     set(SBLIB_LIB_TEST_CASES_SRC
             src/main.cpp
+            src/test_bus.h
+            src/test_bus.cpp
+            src/test_bus_receive.cpp
+            src/test_bus_send.cpp
             src/test_knx_lpdu.cpp
             src/test_knx_lpdu_frames.cpp
     )

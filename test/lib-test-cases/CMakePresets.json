@@ -145,6 +145,18 @@
             ]
         },
         {
+            "name": "release-x64-lf254",
+            "configurePreset": "x64_lf254",
+            "configuration": "Release",
+            "displayName": "x64 L_Data_Extended Target Release Build",
+            "description": "Build the x64 target with SBLIB_MAX_APDU_LENGTH 254 in Release configuration",
+            "hidden": false,
+            "verbose": true,
+            "targets": [
+                "lib-test-cases_x64"
+            ]
+        },
+        {
             "name": "release-x64",
             "configurePreset": "x64",
             "configuration": "Release",
@@ -221,6 +233,17 @@
             "configuration": "Debug",
             "displayName": "x64 L_Data_Extended Target Debug Test",
             "description": "Run tests for the x64 target with SBLIB_MAX_APDU_LENGTH 254 in Debug configuration",
+            "hidden": false,
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "test-release-x64-lf254",
+            "configurePreset": "x64_lf254",
+            "configuration": "Release",
+            "displayName": "x64 L_Data_Extended Target Release Test",
+            "description": "Run tests for the x64 target with SBLIB_MAX_APDU_LENGTH 254 in Release configuration",
             "hidden": false,
             "output": {
                 "outputOnFailure": true
