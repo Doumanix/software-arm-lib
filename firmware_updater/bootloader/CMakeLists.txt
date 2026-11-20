@@ -124,6 +124,13 @@ if(CMAKE_CROSSCOMPILING)
     add_custom_command(TARGET ${TARGET_ARM} POST_BUILD
         COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${TARGET_ARM}> $<TARGET_FILE_DIR:${TARGET_ARM}>/${TARGET_ARM}.bin
     )
+    # Stop if the boot ROM would not start the image (vector table checksum) or if the word at 0x2FC is a code
+    # read protection value; the bootloader starts at 0x0
+    add_custom_command(TARGET ${TARGET_ARM} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -DIMAGE=$<TARGET_FILE_DIR:${TARGET_ARM}>/${TARGET_ARM}.bin
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/check_lpc_image.cmake
+        VERBATIM
+    )
     # Create a second copy of the binary with the name expected by the BootloaderUpdater (bootloader.bin)
     add_custom_command(TARGET ${TARGET_ARM} POST_BUILD
         COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${TARGET_ARM}> $<TARGET_FILE_DIR:${TARGET_ARM}>/bootloader.bin
