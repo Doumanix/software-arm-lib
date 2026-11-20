@@ -101,6 +101,13 @@ if(CMAKE_CROSSCOMPILING)
     add_custom_command(TARGET ${TARGET_ARM} POST_BUILD
         COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${TARGET_ARM}> $<TARGET_FILE_DIR:${TARGET_ARM}>/${TARGET_ARM}.bin
     )
+    # Stop if the boot ROM check of the vector table would fail. The image starts at 0x3000 (flash origin in the
+    # linker script), so the word at 0x2FC of the file is ordinary code and not checked
+    add_custom_command(TARGET ${TARGET_ARM} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -DIMAGE=$<TARGET_FILE_DIR:${TARGET_ARM}>/${TARGET_ARM}.bin -DFLASH_START=0x3000
+                -P ${SB_BOOTLOADER_PATH}/check_lpc_image.cmake
+        VERBATIM
+    )
 else()
     message(FATAL_ERROR "Unknown architecture. Only cross-compiling for ARM is supported.")
 endif()
