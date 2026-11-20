@@ -131,6 +131,12 @@ if(CMAKE_CROSSCOMPILING)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/check_lpc_image.cmake
         VERBATIM
     )
+    # Release only: stop if the bootloader reaches the application descriptor page at 0x2F00
+    add_custom_command(TARGET ${TARGET_ARM} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -DIMAGE=$<TARGET_FILE_DIR:${TARGET_ARM}>/${TARGET_ARM}.bin -DCONFIG=$<CONFIG>
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/check_bootloader_size.cmake
+        VERBATIM
+    )
     # Create a second copy of the binary with the name expected by the BootloaderUpdater (bootloader.bin)
     add_custom_command(TARGET ${TARGET_ARM} POST_BUILD
         COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${TARGET_ARM}> $<TARGET_FILE_DIR:${TARGET_ARM}>/bootloader.bin
